@@ -6,7 +6,12 @@
   no Android plurals elements. Counts go through the plural selector.
   Screens: M1, M1a, M4, M5, M7, M8 and the credential prompt for the actions raised from them.
 -->
-<resources>
+<!--
+  TV Toolkit adds a small Polish translation to this formerly English-only module.
+  Existing upstream strings intentionally fall back to English until the full Polish
+  translation is ready. Suppress only MissingTranslation here; keep every other lint check.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
 
     <!-- Shared button words -->
     <string name="action_back">Back</string>
