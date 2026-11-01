@@ -149,7 +149,7 @@ class ManageMachine(
                         id = tv.id, name = tv.nickname, room = tv.room, clean = off > 0, checkedAtMs = tv.lastSeenAt, level = tv.level,
                         chip = chipFor(states[tv.id]?.takeIf { d.access.live(tv.id) != null }, run, tv.debugging),
                         thumbnail = state.value.cards.firstOrNull { it.id == tv.id }?.thumbnail,
-                        switchedOff = latest?.packages?.count { (_, state) -> state.enabled == EnabledState.DISABLED || state.enabled == EnabledState.DISABLED_USER } ?: off,
+                        switchedOff = maxOf(off, latest?.packages?.count { (_, state) -> state.enabled == EnabledState.DISABLED || state.enabled == EnabledState.DISABLED_USER } ?: 0),
                         dockNames = home?.let { shownDock(it) }.orEmpty().map { d.nameOf(it) },
                         restorePointAtMs = (d.snapshots.baseline(tv.id) ?: latest)?.takenAtMs, debugging = tv.debugging,
                         helpAddTv = tv.profileId == null && latest != null,

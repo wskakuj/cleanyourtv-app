@@ -69,7 +69,7 @@ class SwitchedOffMachine(
     // An updater this build keeps on: no Off pill, no Undo after Put back.
     private fun keptOn(pkg: PackageName): Boolean = !d.store.updatesOff && ProfileCategory.isUpdater(pkg, profileGroups)
 
-    init { scope.launch { load(refresh = true) } }
+    init { scope.launch { load() } }
 
     override fun reduce(state: SwitchedOffState, event: Any): SwitchedOffState = when (event) {
         is Loaded -> event.s.copy(busy = state.busy)
@@ -95,7 +95,7 @@ class SwitchedOffMachine(
             send(BusyOn(pkg))
             val r = writer.write(tvId, request)
             send(BusyOn(null))
-            load(refresh = true)
+            load()
             when (r) {
                 // A switch-off the run skipped changed nothing, so there is nothing to undo:
                 // RF-LAUNCHER-250 F1, kept because it runs the TV's inputs; otherwise the TV kept it
@@ -125,7 +125,7 @@ class SwitchedOffMachine(
             it.enabled == EnabledState.DISABLED || it.enabled == EnabledState.DISABLED_USER
         }.keys
         // A user may have re-enabled our package from a PC since the last run.
-        val ourCurrentOff = if (latest == null) off else off.filter { it in disabled }.toSet()
+        val ourCurrentOff = if (fresh == null) off else off.filter { it in disabled }.toSet()
         val external = disabled.filterNot { it in ourCurrentOff }.sortedBy { it.value }
         externalDisabled = external.toSet()
         fun row(p: PackageName, isOff: Boolean) = OffRow(p, d.nameOf(p, labels[p]?.label), d.facts.lookup(p)?.description, isOff)
@@ -149,7 +149,7 @@ class SwitchedOffMachine(
                 .map { row(it.name, it.name in disabled) })
         }.filter { it.rows.isNotEmpty() } else emptyList()
         send(Loaded(SwitchedOffState(tv.nickname, tv.level, all, ask, null, loading = false,
-            count = if (latest == null) off.size else disabled.size, oursCount = ourCurrentOff.size,
+            count = if (fresh == null) maxOf(off.size, disabled.size) else disabled.size, oursCount = ourCurrentOff.size,
             external = external.map { row(it, true) }, fresh = fresh != null, toolkitMode = true)))
     }
 }

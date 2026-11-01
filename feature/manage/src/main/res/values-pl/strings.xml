@@ -52,4 +52,5 @@
     <string name="tvtoolkit_external_confirm_body">Inne narzędzie lub sam telewizor mógł wyłączyć ten pakiet celowo. Jego włączenie może zmienić konfigurację.</string>
     <string name="tvtoolkit_inventory_refresh">Odśwież stan TV</string>
     <string name="tvtoolkit_disabled_summary">Wyłączone przez tę aplikację: %1$d. Łącznie wyłączone na TV: %2$d.</string>
+    <string name="tvtoolkit_choices_toggle">Dodatkowe wybory: launcher, multimedia i tapeta</string>
 </resources>

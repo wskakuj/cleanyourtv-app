@@ -34,6 +34,8 @@ import tv.cleanyour.ui.design.component.PrimaryButton
 import tv.cleanyour.ui.design.component.ScreenScaffold
 import tv.cleanyour.ui.design.component.ScreenTitle
 import tv.cleanyour.ui.design.component.CytBottomSheet
+import tv.cleanyour.ui.design.component.ChoiceList
+import tv.cleanyour.ui.design.component.ChoiceOption
 import tv.cleanyour.ui.design.component.SheetHeader
 import tv.cleanyour.ui.design.component.SwitchRow
 import tv.cleanyour.ui.design.component.SecondaryButton
@@ -56,6 +58,11 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
     val ready = !state.loading && state.available
     var aiSelected by remember { mutableStateOf(setOf<String>()) }
     var aiConfirm by remember { mutableStateOf(false) }
+    var showOptional by rememberSaveable { mutableStateOf(false) }
+    var launcher by rememberSaveable { mutableStateOf(0) }
+    var youtube by rememberSaveable { mutableStateOf(0) }
+    var media by rememberSaveable { mutableStateOf(0) }
+    var wallpaper by rememberSaveable { mutableStateOf(0) }
     val locale = LocalConfiguration.current.locales[0]
     ScreenScaffold(
         Glow.Tv, modifier,
@@ -117,12 +124,10 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                     if (state.aiApplying) LiveLine(stringResource(R.string.tvtoolkit_ai_working))
                     state.aiOutcome?.let { Banner(it, if (state.aiApplied) BannerTone.SUCCESS else BannerTone.INFO, Modifier.padding(top = 12.dp)) }
                     Gap(20.dp)
+                    SecondaryButton(stringResource(R.string.tvtoolkit_choices_toggle), { showOptional = !showOptional })
+                    if (showOptional) {
                     SectionLabel(stringResource(R.string.tvtoolkit_choices_title))
                     Body(stringResource(R.string.tvtoolkit_choices_intro), Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
-                    var launcher by rememberSaveable { mutableStateOf(0) }
-                    var youtube by rememberSaveable { mutableStateOf(0) }
-                    var media by rememberSaveable { mutableStateOf(0) }
-                    var wallpaper by rememberSaveable { mutableStateOf(0) }
                     val launcherLabels = listOf(stringResource(R.string.tvtoolkit_keep_stock),
                         stringResource(R.string.tvtoolkit_flauncher), stringResource(R.string.tvtoolkit_projectivy))
                     val youtubeLabels = listOf(stringResource(R.string.tvtoolkit_keep_stock),
@@ -132,14 +137,18 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                         stringResource(R.string.tvtoolkit_both))
                     val wallpaperLabels = listOf(stringResource(R.string.tvtoolkit_keep_stock),
                         stringResource(R.string.tvtoolkit_aurora), stringResource(R.string.tvtoolkit_graphite))
-                    SecondaryButton("${stringResource(R.string.tvtoolkit_launcher)}: ${launcherLabels[launcher]}",
-                        { launcher = (launcher + 1) % launcherLabels.size }, Modifier.padding(top = 12.dp))
-                    SecondaryButton("${stringResource(R.string.tvtoolkit_youtube)}: ${youtubeLabels[youtube]}",
-                        { youtube = (youtube + 1) % youtubeLabels.size }, Modifier.padding(top = 8.dp))
-                    SecondaryButton("${stringResource(R.string.tvtoolkit_media)}: ${mediaLabels[media]}",
-                        { media = (media + 1) % mediaLabels.size }, Modifier.padding(top = 8.dp))
-                    SecondaryButton("${stringResource(R.string.tvtoolkit_wallpaper)}: ${wallpaperLabels[wallpaper]}",
-                        { wallpaper = (wallpaper + 1) % wallpaperLabels.size }, Modifier.padding(top = 8.dp))
+                    SectionLabel(stringResource(R.string.tvtoolkit_launcher))
+                    ChoiceList(launcherLabels.mapIndexed { i, label -> ChoiceOption(i.toString(), label, null, icon = null) },
+                        launcher.toString(), { launcher = it.key.toInt() })
+                    SectionLabel(stringResource(R.string.tvtoolkit_youtube))
+                    ChoiceList(youtubeLabels.mapIndexed { i, label -> ChoiceOption(i.toString(), label, null, icon = null) },
+                        youtube.toString(), { youtube = it.key.toInt() })
+                    SectionLabel(stringResource(R.string.tvtoolkit_media))
+                    ChoiceList(mediaLabels.mapIndexed { i, label -> ChoiceOption(i.toString(), label, null, icon = null) },
+                        media.toString(), { media = it.key.toInt() })
+                    SectionLabel(stringResource(R.string.tvtoolkit_wallpaper))
+                    ChoiceList(wallpaperLabels.mapIndexed { i, label -> ChoiceOption(i.toString(), label, null, icon = null) },
+                        wallpaper.toString(), { wallpaper = it.key.toInt() })
                     Banner(stringResource(R.string.tvtoolkit_choices_preview_only), BannerTone.INFO,
                         Modifier.padding(top = 12.dp), icon = CytIcons.Info)
                     SecondaryButton(stringResource(R.string.tvtoolkit_choices_copy), {
@@ -148,6 +157,7 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                             ToolkitMedia.entries[media], ToolkitWallpaper.entries[wallpaper],
                         )))
                     }, Modifier.padding(top = 12.dp))
+                    }
                 }
 
                 if (tvReport && state.aiPrompt.isNotEmpty()) SectionLabel(stringResource(R.string.tvtoolkit_report_technical))
