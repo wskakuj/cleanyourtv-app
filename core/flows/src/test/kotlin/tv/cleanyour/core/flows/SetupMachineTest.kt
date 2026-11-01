@@ -596,10 +596,12 @@ class SetupMachineTest {
         m.effects.test {
             m.dispatch(SetupIntent.Finish)
             settle(3_100)
-            assertEquals(SetupEffect.Navigate("manage/${Samples.miTvId().value}"), drain().last())
+            assertTrue(drain().filterIsInstance<SetupEffect.Navigate>().isEmpty(), "must not leave setup with wireless debugging on")
         }
         assertEquals(3, h.discovery.probes.size - before, "three probes a second apart before recording on")
         assertEquals(DebugState.ON, h.tvs.tvs.value.single().debugging)
+        assertTrue(m.extras.value.finishFailed, "offer a visible retry after debug-off fails")
+        assertNull(m.extras.value.finishing)
         assertTrue(m.extras.value.finishing != Finishing.DONE)
         assertTrue(m.extras.value.chip != ChipState.DEBUGGING_OFF)
     }

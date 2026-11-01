@@ -172,6 +172,8 @@ class HomeKeptTest {
         settle(2_100); settle(700)
         assertIs<SetupState.Found>(m.state.value)
         assertNotNull(h.tvs.tvs.value.single().wizard)
+        // Finishing may navigate only after the ADB port has been confirmed closed.
+        h.discovery.open5555[HOST] = false
         m.effects.test {
             // Finish's own steps follow (debugging off, with its probes a second apart).
             m.dispatch(SetupIntent.LeaveAsIs); settle(3_500)
