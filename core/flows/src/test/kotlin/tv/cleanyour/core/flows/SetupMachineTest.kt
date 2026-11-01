@@ -1391,7 +1391,10 @@ class SetupMachineTest {
                     // test checks how a failed switch classifies FallbackHome, so enable
                     // stock Home first: RecoveryGate must refuse an unsafe starting state.
                     val stock = Samples.stockLauncher.pkg
-                    s.copy(
+                    // Build a fresh, correctly hashed baseline; the snapshot store refuses
+                    // modified content whose saved contentHash no longer matches.
+                    Samples.snapshot(
+                        reason = r,
                         packages = s.packages + (stock to s.packages.getValue(stock).copy(enabled = tv.cleanyour.core.model.EnabledState.ENABLED)),
                         home = s.home.copy(claimants = s.home.claimants + tv.cleanyour.core.model.HomeClaimant(claimant, 1)),
                     )
