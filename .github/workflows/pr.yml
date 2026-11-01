@@ -70,3 +70,14 @@ jobs:
             **/build/outputs/roborazzi/
             **/build/test-results/
           retention-days: 7
+
+      # Fork-only development convenience: the debug APK can be installed on a test phone.
+      # No release signing keys or store credentials are used.
+      - name: TV Toolkit test APK
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tv-toolkit-debug-apk
+          path: app/build/outputs/apk/full/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14

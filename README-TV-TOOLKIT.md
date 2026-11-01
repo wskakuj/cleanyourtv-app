@@ -43,6 +43,10 @@ git submodule update --init --recursive
 
 APK po poprawnym buildzie: `app/build/outputs/apk/full/debug/`.
 
+Na forku GitHub, po włączeniu Actions, workflow `pr` dodatkowo udostępnia testowy
+APK w sekcji **Artifacts** udanego uruchomienia pod nazwą `tv-toolkit-debug-apk`.
+To APK ma podpis debug, jest do testów, a nie do publikacji w sklepie.
+
 Uwaga: obecne środowisko ma JDK 17 i nie ma Android SDK. Nie twierdzimy, że APK jest już skompilowany. Sprawdzono statycznie składnię plików XML i różnice Git.
 
 Zachowaj oryginalne `LICENSE`, `THIRD-PARTY-NOTICES` i informacje o autorach projektu bazowego.
