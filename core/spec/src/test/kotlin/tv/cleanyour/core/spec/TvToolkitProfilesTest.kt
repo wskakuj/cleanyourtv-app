@@ -2,6 +2,7 @@ package tv.cleanyour.core.spec
 
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import tv.cleanyour.core.model.Component
 import tv.cleanyour.core.model.GroupDefault
 import tv.cleanyour.core.model.HomeClaimant
 import tv.cleanyour.core.model.HomeResolution
@@ -21,12 +22,27 @@ class TvToolkitProfilesTest {
 
     @Test fun sharpRequiresModelAndDeviceAndBrand() = runBlocking {
         val real = sample.copy(brand = "Sharp", manufacturer = "SHARP", model = "AQUOS_TVE19A",
-            device = "Aquos_tve19a", sdk = 28)
+            device = "sindang", sdk = 30, fingerprint = "SHARP/tcbrae_a/sindang:11/RTOB.250721.001/13808904:user/release-keys")
         assertEquals(TvToolkitProfiles.SHARP_ID, assertIs<ProfileResolution.Exact>(source.resolve(real)).profile.id)
         assertNull(TvToolkitProfiles.exact(real.copy(device = "another_tv")))
         assertNull(TvToolkitProfiles.exact(real.copy(model = "unknown_sharp")))
         assertNull(TvToolkitProfiles.exact(real.copy(brand = "Another", manufacturer = "Another")))
+        assertNull(TvToolkitProfiles.exact(real.copy(sdk = 29)))
+        assertNull(TvToolkitProfiles.exact(real.copy(sdk = 31)))
+        assertNull(TvToolkitProfiles.exact(real.copy(fingerprint = "SHARP/other/sindang:11/build")))
         assertNull(TvToolkitProfiles.exact(real.copy(sdk = 34)))
+    }
+
+    @Test fun sharpWithThirdPartyHomeStillMatchesWithoutChangingHome() = runBlocking {
+        val real = sample.copy(brand = "SHARP", manufacturer = "SHARP", model = "AQUOS_TVE19A",
+            device = "sindang", sdk = 30, fingerprint = "SHARP/tcbrae_a/sindang:11/RTOB.250721.001/13808904:user/release-keys")
+        val alternativeHome = Component(PackageName("com.example.launcher"), ".Home")
+        val fallback = Component(PackageName("com.android.tv.settings"), ".system.FallbackHome")
+        val home = HomeResolution(alternativeHome, listOf(HomeClaimant(alternativeHome, 0), HomeClaimant(fallback, -1000)))
+        val resolved = assertIs<ProfileResolution.Exact>(source.resolve(real, home))
+        assertEquals(TvToolkitProfiles.SHARP_ID, resolved.profile.id)
+        assertTrue(Quirk.STOCK_LAUNCHER_KEEP_ENABLED in resolved.profile.quirks)
+        assertTrue(resolved.profile.groups.all { it.default == GroupDefault.ASK })
     }
 
     @Test fun philipsMatchesObservedFirmwareOnly() = runBlocking {
@@ -40,7 +56,7 @@ class TvToolkitProfilesTest {
 
     @Test fun aGoogleTvHomeNeverGetsOurAndroidTvSpecificProfile() = runBlocking {
         val real = sample.copy(brand = "Sharp", manufacturer = "SHARP", model = "AQUOS_TVE19A",
-            device = "Aquos_tve19a", sdk = 28)
+            device = "sindang", sdk = 30, fingerprint = "SHARP/tcbrae_a/sindang:11/RTOB.250721.001/13808904:user/release-keys")
         val googleHome = KnownLaunchers.LAUNCHERX
         val home = HomeResolution(googleHome, listOf(HomeClaimant(googleHome, 2)))
         val resolved = source.resolve(real, home)

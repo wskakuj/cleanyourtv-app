@@ -46,7 +46,7 @@ object TvToolkitProfiles {
 
     val sharp: Profile = Profile(
         id = SHARP_ID,
-        match = ProfileMatch(listOf("AQUOS_TVE19A", "65BL2EA"), listOf("Aquos_tve19a"), "Sharp", 26, 32, null),
+        match = ProfileMatch(listOf("AQUOS_TVE19A"), listOf("sindang"), "Sharp", 30, 30, "SHARP/tcbrae_a/sindang:11/"),
         platform = Platform.ANDROID_TV,
         stockLaunchers = listOf(KnownLaunchers.TVLAUNCHER),
         liveTv = pkg("com.android.tv"),
@@ -121,7 +121,8 @@ object TvToolkitProfiles {
             match.models.any { it.equals(facts.model, ignoreCase = true) } &&
             match.devices.any { it.equals(facts.device, ignoreCase = true) } &&
             facts.sdk >= (match.sdkMin ?: Int.MIN_VALUE) &&
-            facts.sdk <= (match.sdkMax ?: Int.MAX_VALUE)
+            facts.sdk <= (match.sdkMax ?: Int.MAX_VALUE) &&
+            (match.fingerprintPrefix?.let { facts.fingerprint.startsWith(it) } ?: true)
     }
 }
 
