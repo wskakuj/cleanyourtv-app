@@ -1,12 +1,30 @@
 package tv.cleanyour.core.flows
 
 import org.junit.Test
+import kotlinx.coroutines.test.runTest
+import tv.cleanyour.testing.fixtures.MemoryDocumentStore
+import tv.cleanyour.core.model.TvId
 import tv.cleanyour.testing.fixtures.Samples
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ToolkitPreferencesTest {
+    @Test fun launcherChoiceIsKeptPerTvAndDefaultsToNoChange() = runTest {
+        val documents = MemoryDocumentStore()
+        val store = ToolkitPreferencesStore(documents)
+        val sharp = TvId("aabbccdd11223344")
+        val philips = TvId("aabbccdd55667788")
+        assertEquals(null, store.loadLauncher(sharp))
+        store.saveLauncher(sharp, ToolkitLauncher.PROJECTIVY)
+        store.saveLauncher(philips, ToolkitLauncher.FLAUNCHER)
+        assertEquals(ToolkitLauncher.PROJECTIVY, store.loadLauncher(sharp))
+        assertEquals(ToolkitLauncher.FLAUNCHER, store.loadLauncher(philips))
+        store.saveLauncher(sharp, ToolkitLauncher.KEEP_STOCK)
+        assertEquals(ToolkitLauncher.KEEP_STOCK, store.loadLauncher(sharp))
+        assertEquals(ToolkitLauncher.FLAUNCHER, store.loadLauncher(philips))
+    }
+
     @Test fun defaultsKeepStockAndNeverInstallAnything() {
         val text = ToolkitPreferences().export(Samples.miTvFacts())
         assertTrue("LAUNCHER=KEEP_STOCK" in text)

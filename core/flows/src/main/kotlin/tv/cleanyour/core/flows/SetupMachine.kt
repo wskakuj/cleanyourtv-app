@@ -150,6 +150,9 @@ data class SetupExtras(
     val connectError: ConnectError? = null,      // 0.3.6: the TV's port answered, the connection failed; the door's card and "Copy error"
     val staleNotice: Boolean = false,            // the TV changed under the plan; a new plan is shown
     val finishing: Finishing? = null,            // D7 "Switching debugging off... done."
+    val finishFailed: Boolean = false,           // Debugging shutdown could not be confirmed; do not silently leave Setup.
+    val toolkitLauncher: ToolkitLauncher = ToolkitLauncher.KEEP_STOCK,
+    val toolkitMode: Boolean = false,
     val keepsDebugging: Boolean = false,         // D7: "Keep debugging on" was chosen, so Finish leaves it on and Done says so
     val restartSlow: Boolean = false,            // UX 4.8 at 3 minutes
     val restartReenabled: Int = 0,               // "2 things came back on after the restart; switched off again."
@@ -269,6 +272,7 @@ class SetupDeps(
     val homeHelper: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
     // 0.4.8: where the restarts are counted (Restarts); the app gives Manage the same one. Null counts none.
     val restarts: Restarts? = documents?.let { Restarts(it) },
+    val toolkitMode: Boolean = false,
 )
 
 // The first-run wizard, screens S1 to S5 (PRODUCT-SPEC 4, UX 2 and 4). One machine per wizard run,
@@ -280,7 +284,7 @@ class SetupMachine(
     private val start: SetupStart = SetupStart.Fresh,
 ) : Machine<SetupState, SetupIntent, SetupEffect>(initialState(start), scope), SetupActions {
 
-    private val mutableExtras = MutableStateFlow(SetupExtras(addOns = deps.store.addOns))
+    private val mutableExtras = MutableStateFlow(SetupExtras(addOns = deps.store.addOns, toolkitMode = deps.toolkitMode))
     val extras: StateFlow<SetupExtras> = mutableExtras.asStateFlow()
 
     // Live context of this wizard run. Only handlers touch it.
@@ -540,6 +544,13 @@ class SetupMachine(
                 }.onFailure { deps.log.line("setup: the photo could not be staged") }
             }
             is SetupIntent.KeepDebuggingOn -> editDraft { it.copy(keepDebuggingOn = event.on) }
+            is SetupIntent.ChooseToolkitLauncher -> if (after is SetupState.Found) {
+                mutableExtras.update { it.copy(toolkitLauncher = event.launcher) }
+                deps.documents?.let { documents -> scope.launch {
+                    attempt { ToolkitPreferencesStore(documents).saveLauncher(after.tvId, event.launcher) }
+                        .onFailure { deps.log.line("setup: launcher preference could not be saved") }
+                } }
+            }
             is SetupIntent.ShowOnTv -> editDraft { it.copy(curtain = event.on) }
             is SetupIntent.HomeHelper -> if (deps.homeHelper) editDraft { it.copy(homeHelper = event.on) }
             SetupIntent.MakeItClean -> if (after is SetupState.Found && !mutableExtras.value.starting) {
@@ -572,7 +583,10 @@ class SetupMachine(
             SetupIntent.Finish -> if (after is SetupState.Done && mutableExtras.value.finishing == null) scope.launch { finish(after.tvId) }
             // 0.4.7 (UX finding 5, PM 7): "Done" on a plan with nothing to switch off and the TV's
             // own home screen kept: no credential prompt, no empty run; the draft ends here.
-            SetupIntent.LeaveAsIs -> if (after is SetupState.Found && !mutableExtras.value.starting && mutableExtras.value.finishing == null) scope.launch { leaveAsIs(after.tvId) }
+            SetupIntent.LeaveAsIs -> if (after is SetupState.Found && !mutableExtras.value.starting && mutableExtras.value.finishing == null) {
+                mutableExtras.update { it.copy(finishing = Finishing.SWITCHING, finishFailed = false) }
+                scope.launch { leaveAsIs(after.tvId) }
+            }
             is Ev.Run -> onRun(before, event)
             is SetupIntent.StopAction -> onStopAction(after, event.action)
             else -> {}
@@ -770,6 +784,10 @@ class SetupMachine(
                 "${launchable?.size?.let { "$it launchable" } ?: "launchable unknown"}, profile ${LogCodes.profile(res)}, ${LogCodes.tv(facts)}")
             val record = upsertTv(s, facts, res)
             tv = record
+            deps.documents?.let { documents ->
+                val saved = attempt { ToolkitPreferencesStore(documents).loadLauncher(tvId) }.getOrNull()
+                if (saved != null) mutableExtras.update { it.copy(toolkitLauncher = saved) }
+            }
             // Test build: a list not tested yet waits for the person's answer on the card.
             val candidate = deps.candidates?.offer(facts, snap.home, snap.packages)
             if (candidate != null) {
@@ -1739,7 +1757,10 @@ class SetupMachine(
     // 0.4.7: Setup ends without a run (nothing to switch off, the TV keeps its own home screen). The
     // draft is cleared so the app does not reopen the wizard, then Finish's own steps.
     private suspend fun leaveAsIs(tvId: TvId) {
-        val record = tv ?: deps.tvs.tvs.value.firstOrNull { it.id == tvId } ?: return
+        val record = tv ?: deps.tvs.tvs.value.firstOrNull { it.id == tvId } ?: run {
+            mutableExtras.update { it.copy(finishing = null, finishFailed = true) }
+            return
+        }
         deps.log.line("setup: left as is, nothing to switch off")
         val done = record.copy(wizard = null, lastSeenAt = deps.clock.nowMs())
         tv = done
@@ -1751,13 +1772,17 @@ class SetupMachine(
     private suspend fun finish(tvId: TvId) {
         val keep = keepsDebugging(tvId)
         if (!keep) {
-            mutableExtras.update { it.copy(finishing = Finishing.SWITCHING) }
-            // "done" and the "Debugging off" chip only when a failed probe confirmed it (D7); otherwise
-            // Manage opens at once and its card shows what the record says.
-            if (deps.sessionEnd.switchOff(tvId) == DebugState.OFF) {
-                mutableExtras.update { it.copy(finishing = Finishing.DONE, chip = ChipState.DEBUGGING_OFF) }
-                delay(600)
+            mutableExtras.update { it.copy(finishing = Finishing.SWITCHING, finishFailed = false) }
+            // Finishing can take time on some firmware. A hung ADB connection must not make Done
+            // appear inert, or silently leave wireless debugging on. Allow retry on a failure.
+            val result = attempt { withTimeoutOrNull(15_000) { deps.sessionEnd.switchOff(tvId) } }.getOrNull()
+            if (result != DebugState.OFF) {
+                deps.log.line("setup: could not confirm debugging is off; finish needs a retry")
+                mutableExtras.update { it.copy(finishing = null, finishFailed = true) }
+                return
             }
+            mutableExtras.update { it.copy(finishing = Finishing.DONE, chip = ChipState.DEBUGGING_OFF) }
+            delay(600)
         }
         effect(SetupEffect.Navigate("manage/${tvId.value}"))
     }

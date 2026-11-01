@@ -212,6 +212,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         documents = documents,     // 0.4.0: the person's photo for the look step (OwnPicture)
         wrongFocus = { tvId -> wrongFocus.remove(tvId) },                 // issue #629
         restarts = restarts,       // 0.4.8
+        toolkitMode = true,        // TV Toolkit fork: show the external-launcher preference picker
     )
 
     val manageDeps = ManageDeps(

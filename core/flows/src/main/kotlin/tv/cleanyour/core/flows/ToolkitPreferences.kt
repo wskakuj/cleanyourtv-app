@@ -1,6 +1,8 @@
 package tv.cleanyour.core.flows
 
 import tv.cleanyour.core.model.DeviceFacts
+import tv.cleanyour.core.model.TvId
+import tv.cleanyour.core.store.DocumentStore
 
 /** Explicit choices made on the phone. These are an exportable draft, never executable ADB text. */
 enum class ToolkitLauncher { KEEP_STOCK, FLAUNCHER, PROJECTIVY }
@@ -30,5 +32,21 @@ data class ToolkitPreferences(
         appendLine("WALLPAPER=${wallpaper.name}")
         appendLine("STATUS=PREVIEW_ONLY")
         appendLine("END_TV_TOOLKIT_PREFERENCES")
+    }
+}
+
+/** A per-TV local preference; never interprets a selected launcher as an ADB command. */
+class ToolkitPreferencesStore(private val documents: DocumentStore) {
+    private fun path(tvId: TvId) = "tvs/${tvId.value}/toolkit-launcher.txt"
+
+    suspend fun loadLauncher(tvId: TvId): ToolkitLauncher? {
+        val content = documents.read(path(tvId)) { it.decodeToString() } ?: return null
+        if (!content.startsWith("TV_TOOLKIT_LAUNCHER_V1\n")) return null
+        val value = content.lineSequence().firstOrNull { it.startsWith("LAUNCHER=") }?.removePrefix("LAUNCHER=")
+        return ToolkitLauncher.entries.firstOrNull { it.name == value }
+    }
+
+    suspend fun saveLauncher(tvId: TvId, launcher: ToolkitLauncher) {
+        documents.write(path(tvId), "TV_TOOLKIT_LAUNCHER_V1\nLAUNCHER=${launcher.name}\n".encodeToByteArray())
     }
 }

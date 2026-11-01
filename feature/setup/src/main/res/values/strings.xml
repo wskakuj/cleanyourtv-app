@@ -74,6 +74,15 @@
     <string name="found_home_row_rows">Home screen: {dock}, plus {count, plural, one {# app} other {# apps}} below</string>
     <string name="found_home_row_cd">Home screen dock: {dock}</string>
     <string name="found_home_change">Change</string>
+    <!-- Toolkit launcher selection: saved separately; installing an external APK is not enabled yet. -->
+    <string name="toolkit_launcher_row">Launcher preference: %1$s</string>
+    <string name="toolkit_launcher_title">Choose a launcher</string>
+    <string name="toolkit_launcher_keep">No change (keep current Home)</string>
+    <string name="toolkit_launcher_keep_note">Leave the TV menu as it is</string>
+    <string name="toolkit_launcher_flauncher" translatable="false">FLauncher</string>
+    <string name="toolkit_launcher_projectivy" translatable="false">Projectivy Launcher</string>
+    <string name="toolkit_launcher_preview_note">This saves your preference on the phone. Installing or switching an external launcher is not available yet; your TV menu will not be changed by this choice.</string>
+    <string name="toolkit_finish_failed">Couldn\'t confirm that debugging was switched off. Check the TV\'s developer settings and tap Done to retry. For safety we haven\'t finished setup.</string>
     <!-- An empty dock: the row names the new home screen (UX 2 dock card title) instead of a blank list -->
     <string name="found_home_row_empty">Your new home screen</string>
     <string name="found_safety">A restore point is saved first, so everything can be put back.</string>

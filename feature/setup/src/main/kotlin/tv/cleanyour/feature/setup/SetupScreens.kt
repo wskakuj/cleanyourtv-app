@@ -66,6 +66,7 @@ import tv.cleanyour.core.flows.SetupState
 import tv.cleanyour.core.flows.Sheet
 import tv.cleanyour.core.flows.StopAction
 import tv.cleanyour.core.flows.StopCase
+import tv.cleanyour.core.flows.ToolkitLauncher
 import tv.cleanyour.core.model.Level
 import tv.cleanyour.core.model.PackageName
 import tv.cleanyour.core.planner.GroupSummary
@@ -76,6 +77,8 @@ import tv.cleanyour.ui.design.component.Banner
 import tv.cleanyour.ui.design.component.BannerTone
 import tv.cleanyour.ui.design.component.CheckLine
 import tv.cleanyour.ui.design.component.CheckState
+import tv.cleanyour.ui.design.component.ChoiceList
+import tv.cleanyour.ui.design.component.ChoiceOption
 import tv.cleanyour.ui.design.component.CollapsedGroupsCard
 import tv.cleanyour.ui.design.icon.CytIcons
 import tv.cleanyour.ui.design.component.CountdownConfirm
@@ -233,10 +236,13 @@ fun FoundScreen(
     // 0.4.7-beta2 (issue #251): with the Home button helper switched on there is something to do.
     val nothingToDo = kept != null && off == 0 && !extras.helperOn
     var why by rememberSaveable { mutableStateOf(false) }
+    var chooseLauncher by rememberSaveable { mutableStateOf(false) }
     val locale = LocalConfiguration.current.locales[0]
     ScreenScaffold(
         Glow.Tv, modifier,
-        topBar = { TopBar(extras, onBack = { actions.back() }) },
+        // On S3, back() deliberately returns false unless a sheet is open. The toolbar must
+        // perform the same navigation fallback as Android's system Back button.
+        topBar = { TopBar(extras, onBack = { if (!actions.back()) actions.intent(SetupIntent.LeaveAsIs) }) },
         bottomBar = {
             // UX 7.3 rule 8: the safety sentence sits above the button that needs it, so it is
             // pinned with the button rather than scrolled under it (R4-W8).
@@ -252,11 +258,11 @@ fun FoundScreen(
                     // helper is offered, or a TV cleaned before (Run Setup again) could never reach it (#251).
                     nothingToDo && extras.unknownModel -> {
                         PrimaryButton(stringResource(R.string.found_help_add_tv), onHelpAddTv, guardObscured = false)
-                        SecondaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) })
+                        SecondaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, enabled = extras.finishing == null)
                         if (extras.helperOffer) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
                     }
                     nothingToDo -> {
-                        PrimaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, guardObscured = false)
+                        PrimaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, enabled = extras.finishing == null, loading = extras.finishing == Finishing.SWITCHING, guardObscured = false)
                         if (extras.helperOffer) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
                     }
                     else -> {
@@ -282,6 +288,18 @@ fun FoundScreen(
         }
         // The outcome first, above the fold: the TV keeps its own home screen, and in one line why.
         if (kept != null) KeptRow(kept, Modifier.padding(top = 16.dp), onWhy = { why = true })
+        // The launcher choice is independent of debloat, including on an already cleaned TV.
+        if (extras.toolkitMode) {
+            val launcherName = when (extras.toolkitLauncher) {
+                ToolkitLauncher.KEEP_STOCK -> stringResource(R.string.toolkit_launcher_keep)
+                ToolkitLauncher.FLAUNCHER -> stringResource(R.string.toolkit_launcher_flauncher)
+                ToolkitLauncher.PROJECTIVY -> stringResource(R.string.toolkit_launcher_projectivy)
+            }
+            TextActionRow(stringResource(R.string.toolkit_launcher_row, launcherName), stringResource(R.string.found_home_change),
+                { chooseLauncher = true }, Modifier.padding(top = 12.dp))
+        }
+        if (extras.finishing == Finishing.SWITCHING) Banner(stringResource(R.string.done_finishing), BannerTone.INFO, Modifier.padding(top = 12.dp))
+        if (extras.finishFailed) Banner(stringResource(R.string.toolkit_finish_failed), BannerTone.WARNING, Modifier.padding(top = 12.dp))
         // RFC-HELPER-1 (test build): the Home button helper's outcome instead.
         if (extras.helperOn) HelperOutcomeRow(Modifier.padding(top = 16.dp))
         if (extras.unknownModel) {
@@ -334,6 +352,21 @@ fun FoundScreen(
         else -> {}
     }
     if (why && kept != null) CytBottomSheet({ why = false }) { WhyKeptContent(kept, onOpenUrl, onHelpAddTv = if (kept.unlisted && HomeKept.needsList(kept.block, true)) onHelpAddTv else null) }
+    if (chooseLauncher) CytBottomSheet({ chooseLauncher = false }) {
+        SheetHeader(stringResource(R.string.toolkit_launcher_title), subtitle = stringResource(R.string.toolkit_launcher_preview_note))
+        ChoiceList(
+            options = listOf(
+                ChoiceOption(ToolkitLauncher.KEEP_STOCK.name, stringResource(R.string.toolkit_launcher_keep), stringResource(R.string.toolkit_launcher_keep_note)),
+                ChoiceOption(ToolkitLauncher.FLAUNCHER.name, stringResource(R.string.toolkit_launcher_flauncher)),
+                ChoiceOption(ToolkitLauncher.PROJECTIVY.name, stringResource(R.string.toolkit_launcher_projectivy)),
+            ),
+            selectedKey = extras.toolkitLauncher.name,
+            onSelect = { option ->
+                actions.intent(SetupIntent.ChooseToolkitLauncher(ToolkitLauncher.valueOf(option.key)))
+                chooseLauncher = false
+            },
+        )
+    }
 }
 
 fun shortDate(ms: Long, locale: java.util.Locale): String = SimpleDateFormat("d MMM", locale).format(Date(ms))
@@ -880,6 +913,7 @@ fun DoneScreen(state: SetupState.Done, extras: SetupExtras, actions: SetupAction
         val nothing = extras.doneNothing
         ScreenTitle(stringResource(when { nothing -> R.string.done_title_nothing; kept != null -> R.string.done_title_kept; else -> R.string.done_title }),
             Modifier.padding(top = 22.dp), size = TitleSize.DISPLAY)
+        if (extras.finishFailed) Banner(stringResource(R.string.toolkit_finish_failed), BannerTone.WARNING, Modifier.padding(top = 14.dp))
         val lead = when {
             // "We weren't sure about anything" only when nothing was planned on a TV without an exact list.
             nothing -> stringResource(when {
