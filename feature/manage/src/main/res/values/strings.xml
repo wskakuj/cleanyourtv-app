@@ -302,4 +302,25 @@
     <string name="tvtoolkit_ai_check">Check proposed packages</string>
     <string name="tvtoolkit_ai_valid">Format and protected-package checks passed. This is only a preview; each change will still need a restore point, a live TV check and your approval.</string>
     <string name="tvtoolkit_ai_invalid">The reply was rejected. No changes have been made. Check the reasons below and ask AI to correct the list.</string>
+    <!-- Selections are an offline draft; external APK installation is not implemented yet. -->
+    <string name="tvtoolkit_choices_title">Your TV Toolkit setup</string>
+    <string name="tvtoolkit_choices_intro">Tap each row to choose an option. Copy your preferences for the next setup step.</string>
+    <string name="tvtoolkit_launcher">Home screen</string>
+    <string name="tvtoolkit_youtube">YouTube</string>
+    <string name="tvtoolkit_media">Media apps</string>
+    <string name="tvtoolkit_wallpaper">Wallpaper</string>
+    <string name="tvtoolkit_keep_stock">Keep current</string>
+    <string name="tvtoolkit_flauncher">FLauncher</string>
+    <string name="tvtoolkit_projectivy">Projectivy Launcher</string>
+    <string name="tvtoolkit_youtube_alternative">Ad-free alternative (pending verification)</string>
+    <string name="tvtoolkit_none">None</string>
+    <string name="tvtoolkit_plex">Plex</string>
+    <string name="tvtoolkit_wholphin">Wholphin</string>
+    <string name="tvtoolkit_both">Plex and Wholphin</string>
+    <string name="tvtoolkit_aurora">Aurora</string>
+    <string name="tvtoolkit_graphite">Graphite</string>
+    <string name="tvtoolkit_choices_preview_only">Selections are a draft only. No APKs are downloaded or installed and the stock launcher remains untouched. Installation will require source, signature and CPU compatibility checks.</string>
+    <string name="tvtoolkit_choices_copy">Copy my choices</string>
+    <string name="tvtoolkit_matched_profile">Matched TV Toolkit profile</string>
+    <string name="tvtoolkit_profile_caution">Each package is optional; never disable all packages automatically.</string>
 </resources>

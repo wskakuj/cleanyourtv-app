@@ -8,15 +8,17 @@ Własny wariant mobilnej aplikacji Clean Your TV, rozwijany na podstawie kodu na
 - Ekran kopiowania promptu i wklejania odpowiedzi AI w podglądzie raportu telewizora.
 - Ścisły format: parser odrzuca komendy, obcy model, pakiety nieobecne, wcześniej wyłączone lub chronione, duplikaty oraz nieprawidłowe nazwy.
 - Blokadę startu Setup bez bazowej kopii stanu; zmiana Home wymaga timera awaryjnego na TV i działającego fabrycznego launchera.
-- Testy jednostkowe parsera i zabezpieczenia (jeszcze nieuruchomione w środowisku bez JDK 21/SDK).
+- Testy jednostkowe parsera i zabezpieczenia (pierwszy etap przeszedł GitHub Actions #7).
+- Dwa odrębne, ściśle dopasowane profile Sharp AQUOS_TVE19A i Philips TPM191E. Wszystkie kandydatury do wyłączenia wymagają decyzji użytkownika, a stockowy Home, aktualizacje firmware i pilot pozostają chronione.
+- Wybór FLauncher / Projectivy, stockowy YouTube / alternatywa, Plex / Wholphin / oba i tapety. Na razie można skopiować projekt tych wyborów — bez instalowania zewnętrznych APK.
 
 **Ważne:** odpowiedź AI na razie służy tylko do podglądu. Nie ma jeszcze przycisku wykonania listy AI. Integrację z planowaniem i zmianami w TV dodamy po testach bezpieczeństwa.
 
 ## Zaplanowany pełny zakres
 
-1. Osobne profile dla Sharp AQUOS_TVE19A i Philips 75PUS7354/12 z oryginalnych archiwów, ze sprawdzeniem listy pakietów i wersji Androida.
-2. Wybór FLauncher albo Projectivy Launcher. Przed wyłączeniem stockowego Home: instalacja nowego, próba HOME, uzbrojenie watchdog i możliwość powrotu.
-3. Wybór: stockowy YouTube albo opcjonalna aplikacja alternatywna; Plex, Wholphin lub oba. Automatyczne wykrywanie ABI 32/64-bit.
+1. Osobne profile dla Sharp AQUOS_TVE19A i Philips 75PUS7354/12 z oryginalnych archiwów, ze sprawdzeniem modelu, platformy i wersji Androida. **Wprowadzono jako profile ostrożne, bez automatycznego debloatu.**
+2. Wybór FLauncher albo Projectivy Launcher. **UI wyboru wprowadzono, instalator i procedura zmiany Home nadal do wykonania.** Przed wyłączeniem stockowego Home: instalacja nowego, próba HOME, uzbrojenie watchdog i możliwość powrotu.
+3. Wybór: stockowy YouTube albo opcjonalna aplikacja alternatywna; Plex, Wholphin lub oba. **UI wyboru wprowadzono; automatyczne pobieranie, kontrola podpisów i wykrywanie ABI wymagają dalszej implementacji.**
 4. Narzędzia: tapety, zrzuty ekranu, diagnostyka pamięci, „ghost volume”, reset pilota w aplikacji telefonu.
 5. Zastosowanie listy AI wyłącznie przez zwykły planner, po świeżej analizie TV, utworzeniu backupu, pokazaniu każdego pakietu i oddzielnej zgodzie.
 
@@ -33,11 +35,10 @@ Własny wariant mobilnej aplikacji Clean Your TV, rozwijany na podstawie kodu na
 Źródła bazowe wymagają JDK 21, Android SDK (compile SDK 37) i submodułu `third_party/cleanyourtv`.
 
 ```powershell
-git clone --recurse-submodules https://github.com/udhaykumarbala/cleanyourtv-app.git TVToolkit
+git clone --recurse-submodules https://github.com/wskakuj/cleanyourtv-app.git TVToolkit
 cd TVToolkit
-git checkout 8ec0679f0a3b04cbf1a23d7762f68b35679f8b59
+git checkout feature/tv-toolkit-ai-recovery-v01
 git submodule update --init --recursive
-# Rozpakuj ZIP z nakładką TV Toolkit do folderu TVToolkit, ze scaleniem folderów.
 .\gradlew.bat :core:flows:test :app:assembleFullDebug
 ```
 
@@ -47,6 +48,6 @@ Na forku GitHub, po włączeniu Actions, workflow `pr` dodatkowo udostępnia tes
 APK w sekcji **Artifacts** udanego uruchomienia pod nazwą `tv-toolkit-debug-apk`.
 To APK ma podpis debug, jest do testów, a nie do publikacji w sklepie.
 
-Uwaga: obecne środowisko ma JDK 17 i nie ma Android SDK. Nie twierdzimy, że APK jest już skompilowany. Sprawdzono statycznie składnię plików XML i różnice Git.
+Pierwszy etap (commit 3ccdad3) miał zielony build GitHub Actions i APK testowy. Kolejne zmiany mają osobną weryfikację CI; wynik poprzedniego buildu nie potwierdza automatycznie poprawności nowej wersji.
 
 Zachowaj oryginalne `LICENSE`, `THIRD-PARTY-NOTICES` i informacje o autorach projektu bazowego.

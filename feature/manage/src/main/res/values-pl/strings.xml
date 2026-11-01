@@ -10,4 +10,24 @@
     <string name="tvtoolkit_ai_check">Sprawdź proponowane pakiety</string>
     <string name="tvtoolkit_ai_valid">Format i lista pakietów chronionych przeszły kontrolę. To tylko podgląd. Przed zmianami będzie potrzebna kopia, ponowna analiza TV i Twoja zgoda.</string>
     <string name="tvtoolkit_ai_invalid">Odpowiedź została odrzucona. Nic nie zmieniono. Sprawdź powody poniżej i poproś AI o poprawienie listy.</string>
+    <string name="tvtoolkit_choices_title">Wybierz konfigurację TV Toolkit</string>
+    <string name="tvtoolkit_choices_intro">Naciśnij każdą pozycję, aby zmienić wybór. Potem skopiuj preferencje do dalszej konfiguracji.</string>
+    <string name="tvtoolkit_launcher">Ekran główny</string>
+    <string name="tvtoolkit_youtube">YouTube</string>
+    <string name="tvtoolkit_media">Aplikacje multimedialne</string>
+    <string name="tvtoolkit_wallpaper">Tapeta</string>
+    <string name="tvtoolkit_keep_stock">Zachowaj obecną</string>
+    <string name="tvtoolkit_flauncher">FLauncher</string>
+    <string name="tvtoolkit_projectivy">Projectivy Launcher</string>
+    <string name="tvtoolkit_youtube_alternative">Bez reklam (weryfikacja źródła w przygotowaniu)</string>
+    <string name="tvtoolkit_none">Żadne</string>
+    <string name="tvtoolkit_plex">Plex</string>
+    <string name="tvtoolkit_wholphin">Wholphin</string>
+    <string name="tvtoolkit_both">Plex i Wholphin</string>
+    <string name="tvtoolkit_aurora">Aurora</string>
+    <string name="tvtoolkit_graphite">Grafit</string>
+    <string name="tvtoolkit_choices_preview_only">To tylko projekt wyboru. Niczego nie pobieramy ani nie instalujemy, fabryczny launcher pozostaje nietknięty. Instalacja będzie wymagała sprawdzenia źródła, podpisu APK i zgodności procesora.</string>
+    <string name="tvtoolkit_choices_copy">Kopiuj mój wybór</string>
+    <string name="tvtoolkit_matched_profile">Dopasowany profil TV Toolkit</string>
+    <string name="tvtoolkit_profile_caution">Każdy pakiet jest opcjonalny; nie wyłączaj wszystkich automatycznie.</string>
 </resources>

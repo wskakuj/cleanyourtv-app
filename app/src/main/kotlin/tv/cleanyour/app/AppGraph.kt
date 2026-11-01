@@ -73,6 +73,7 @@ import tv.cleanyour.core.registry.UrlConnectionFetcher
 import tv.cleanyour.core.spec.BundledFactsTable
 import tv.cleanyour.core.spec.BundledProfileSource
 import tv.cleanyour.core.spec.BundledThemeSource
+import tv.cleanyour.core.spec.TvToolkitProfileSource
 import tv.cleanyour.core.store.Clock
 import tv.cleanyour.core.trust.BundledCurtainPin
 import tv.cleanyour.core.trust.BundledLauncherPin
@@ -122,7 +123,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
     ))
     // Test build: the person's answers on Setup's candidate list card, which every resolve reads.
     val candidateChoices = tv.cleanyour.core.flows.CandidateChoices(documents)
-    val profiles = BundledProfileSource(consent = candidateChoices)
+    val profiles = TvToolkitProfileSource(BundledProfileSource(consent = candidateChoices))
     val facts = BundledFactsTable()
 
     // W3: renderer variant A (the nohup setsid watchdog) until S12 says otherwise.

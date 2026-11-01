@@ -23,10 +23,23 @@ Status: projekt rozwojowy oparty na Clean Your TV (MIT). Ten dokument opisuje za
 
 ## Kolejne etapy
 
-1. Parser i walidator odpowiedzi AI z testami. **Wprowadzono; wymaga jeszcze wykonania testów Gradle.**
+1. Parser i walidator odpowiedzi AI z testami. **Wprowadzono; CI #7 przeszedł.**
 2. UI do kopiowania promptu i podglądu importu listy. **Wprowadzono; celowo bez wykonywania zmian.**
-3. Profile Sharp AQUOS_TVE19A i Philips TPM191E z dwóch oryginalnych zestawów.
-4. Wybór launcherów i zewnętrznych APK po weryfikacji źródła oraz podpisu.
+3. Profile Sharp AQUOS_TVE19A i Philips TPM191E z dwóch oryginalnych zestawów. **Dodano do aplikacji: wymagają jednocześnie zgodności marki, modelu, identyfikatora platformy i wersji API. Wszystkie pozycje są opcjonalne (ASK); pakiety systemowe, aktualizacje, Cast, pilot i stock Home nie są automatycznie wyłączane.**
+4. Wybór launcherów i zewnętrznych APK po weryfikacji źródła oraz podpisu. **Dodano ekran wyboru FLauncher/Projectivy, YouTube stock/alternatywa, Plex/Wholphin/oba i tapety oraz kopiowanie projektu konfiguracji. Instalator APK jeszcze nie jest podłączony — żadna z tych opcji nie dokonuje zmian na TV.**
 5. Funkcje serwisowe, tapety, testy realnych urządzeń i wydanie APK.
 
 Wprowadzony mechanizm `RecoveryGate` blokuje Setup, gdy brakuje poprawnej kopii stanu, tożsamość telewizora jest niepewna lub zmiana Home nie ma uzbrojonego watchdoga i dostępnego fabrycznego launchera. Istniejące mechanizmy `DefaultEngine` nadal obowiązują.
+
+## Profil z archiwum właściciela a zgodność
+
+- Sharp: dopasowanie urządzenia `Aquos_tve19a`, modelu `AQUOS_TVE19A` lub `65BL2EA` i marki Sharp (API 26–32).
+- Philips: `TPM191E` + `PH9M_EA_5599` + marka Philips (API 30). Sama nazwa TPM191E nie wystarcza do dopasowania.
+- Gdy którykolwiek warunek nie pasuje, obowiązuje ostrożniejszy standardowy profil bądź analiza nieznanego TV. Bez automatycznego stosowania list z innego modelu.
+- Specjalnie wstrzymano automat wyłączania stock Home, OTA, usług TV/HDMI, pilota i Cast. Część pozycji dawnych skryptów usunięto z listy zmian, bo korzystanie z nich było osobistą decyzją i wymaga weryfikacji na każdym egzemplarzu.
+
+## Przed podłączeniem instalatora APK i napraw serwisowych
+
+- Wskazać oficjalne źródła oraz licencje zewnętrznych APK, sprawdzać SHA-256, signer, ABI i minimalne SDK; nie kopiować anonimowych APK z ZIP-ów do aplikacji bez takiej weryfikacji.
+- Zmiana Home wymaga próby powrotu i TV-side watchdog; samo zapisanie wyboru nie uprawnia do wyłączenia fabrycznego launchera.
+- Naprawa ghost volume `sm forget` może usunąć odniesienia do pamięci adoptowanej, a reset usługi pilota może skasować parowanie. Obie operacje muszą mieć osobne ostrzeżenia i diagnostykę stanu; nie uruchamiać ich zbiorczo jako „napraw wszystko”.

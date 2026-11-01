@@ -14,6 +14,11 @@ import tv.cleanyour.core.flows.ReportIntent
 import tv.cleanyour.core.flows.ReportKind
 import tv.cleanyour.core.flows.SentReports
 import tv.cleanyour.core.flows.AiReview
+import tv.cleanyour.core.flows.ToolkitLauncher
+import tv.cleanyour.core.flows.ToolkitMedia
+import tv.cleanyour.core.flows.ToolkitPreferences
+import tv.cleanyour.core.flows.ToolkitWallpaper
+import tv.cleanyour.core.flows.ToolkitYouTube
 import tv.cleanyour.ui.design.component.CytTextField
 import tv.cleanyour.ui.design.component.LinkRow
 import tv.cleanyour.ui.design.component.TertiaryButton
@@ -96,6 +101,10 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                 Body(stringResource(hint), Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp))
                 if (tvReport && state.aiPrompt.isNotEmpty()) {
                     Gap(20.dp)
+                    state.toolkitProfileName?.let { name ->
+                        Banner("${stringResource(R.string.tvtoolkit_matched_profile)}: $name. ${stringResource(R.string.tvtoolkit_profile_caution)}",
+                            BannerTone.INFO, Modifier.padding(bottom = 12.dp), icon = CytIcons.Info)
+                    }
                     SectionLabel(stringResource(R.string.tvtoolkit_ai_title))
                     Body(stringResource(R.string.tvtoolkit_ai_intro), Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
                     Banner(stringResource(R.string.tvtoolkit_ai_privacy), BannerTone.INFO, Modifier.padding(top = 12.dp), icon = CytIcons.Info)
@@ -113,6 +122,38 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                         if (preview.packages.isNotEmpty()) MonospaceBlock(preview.packages.map { it.value }, wrap = true)
                         if (preview.problems.isNotEmpty()) MonospaceBlock(preview.problems.take(25), wrap = true)
                     }
+                    Gap(20.dp)
+                    SectionLabel(stringResource(R.string.tvtoolkit_choices_title))
+                    Body(stringResource(R.string.tvtoolkit_choices_intro), Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
+                    var launcher by rememberSaveable { mutableStateOf(0) }
+                    var youtube by rememberSaveable { mutableStateOf(0) }
+                    var media by rememberSaveable { mutableStateOf(0) }
+                    var wallpaper by rememberSaveable { mutableStateOf(0) }
+                    val launcherLabels = listOf(stringResource(R.string.tvtoolkit_keep_stock),
+                        stringResource(R.string.tvtoolkit_flauncher), stringResource(R.string.tvtoolkit_projectivy))
+                    val youtubeLabels = listOf(stringResource(R.string.tvtoolkit_keep_stock),
+                        stringResource(R.string.tvtoolkit_youtube_alternative))
+                    val mediaLabels = listOf(stringResource(R.string.tvtoolkit_none),
+                        stringResource(R.string.tvtoolkit_plex), stringResource(R.string.tvtoolkit_wholphin),
+                        stringResource(R.string.tvtoolkit_both))
+                    val wallpaperLabels = listOf(stringResource(R.string.tvtoolkit_keep_stock),
+                        stringResource(R.string.tvtoolkit_aurora), stringResource(R.string.tvtoolkit_graphite))
+                    SecondaryButton("${stringResource(R.string.tvtoolkit_launcher)}: ${launcherLabels[launcher]}",
+                        { launcher = (launcher + 1) % launcherLabels.size }, Modifier.padding(top = 12.dp))
+                    SecondaryButton("${stringResource(R.string.tvtoolkit_youtube)}: ${youtubeLabels[youtube]}",
+                        { youtube = (youtube + 1) % youtubeLabels.size }, Modifier.padding(top = 8.dp))
+                    SecondaryButton("${stringResource(R.string.tvtoolkit_media)}: ${mediaLabels[media]}",
+                        { media = (media + 1) % mediaLabels.size }, Modifier.padding(top = 8.dp))
+                    SecondaryButton("${stringResource(R.string.tvtoolkit_wallpaper)}: ${wallpaperLabels[wallpaper]}",
+                        { wallpaper = (wallpaper + 1) % wallpaperLabels.size }, Modifier.padding(top = 8.dp))
+                    Banner(stringResource(R.string.tvtoolkit_choices_preview_only), BannerTone.INFO,
+                        Modifier.padding(top = 12.dp), icon = CytIcons.Info)
+                    SecondaryButton(stringResource(R.string.tvtoolkit_choices_copy), {
+                        onIntent(ReportIntent.CopyToolkitPreferences(ToolkitPreferences(
+                            ToolkitLauncher.entries[launcher], ToolkitYouTube.entries[youtube],
+                            ToolkitMedia.entries[media], ToolkitWallpaper.entries[wallpaper],
+                        )))
+                    }, Modifier.padding(top = 12.dp))
                 }
                 Gap(16.dp)
             }
