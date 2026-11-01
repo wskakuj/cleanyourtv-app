@@ -170,9 +170,9 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
     // Never widen the signed module registry's host trust list, or enable downloads in Play.
     private val toolkitAllowed: (String) -> Boolean = { DownloadHosts.isAllowed(it, DownloadHosts.ALL + "gitlab.com") }
     private val toolkitHttp = UrlConnectionFetcher(urlAllowed = toolkitAllowed)
-    val toolkitFetcher = if (store.rules.addOns) {
+    val toolkitFetcher = store.addOnFetcher {
         ResumableArtifactFetcher(toolkitHttp, blobs, blobs, inspector, urlAllowed = toolkitAllowed)
-    } else null
+    }
 
     val seams = Seams(
         sessions = sessions, keyInfo = keyInfo, prober = prober, profiles = profiles, facts = facts, themes = themes,
@@ -221,7 +221,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         wrongFocus = { tvId -> wrongFocus.remove(tvId) },                 // issue #629
         restarts = restarts,       // 0.4.8
         toolkitMode = store.rules.addOns, // Full build only; Play never installs an external APK.
-        toolkitFetcher = toolkitFetcher,
+        toolkitFetcher = toolkitFetcher.takeIf { store.rules.addOns },
         toolkitInspector = inspector,
     )
 

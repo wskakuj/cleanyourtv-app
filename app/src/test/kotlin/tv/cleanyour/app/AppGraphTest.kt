@@ -77,6 +77,8 @@ class AppGraphTest {
         assertIs<IndexRegistry>(g.seams.registry)
         // The fetcher is the flavour's (FullStoreTest, PlayStoreTest); the graph uses this build's Store.
         assertSame(Store, g.store)
+        assertEquals(Store.rules.addOns, g.setupDeps.toolkitMode)
+        assertEquals(Store.rules.addOns, g.setupDeps.toolkitFetcher != null)
         assertIs<MaterializedThemeSource>(g.seams.themes)
         // 0.4.6: what a card puts into a problem report goes through the app's redactor.
         assertEquals("at x.x.x.20 code [code]", g.manageDeps.redact("at 192.168.1.20 code 482913"))
@@ -145,7 +147,7 @@ class AppGraphTest {
     }
 
     // W5 wiring note, per flavour (STORES-PLAN 1): this build's network security config names exactly
-    // its Store.hosts (DownloadHosts.ALL in the full build, none in the Play build), with system
+    // its Store.hosts, plus GitLab for the pinned launchers in full only, with system
     // anchors only and no cleartext. Read from the merged resources of the variant under test.
     @Test fun theNetworkConfigNamesExactlyTheStoreHosts() {
         val domains = mutableSetOf<String>()
@@ -162,7 +164,10 @@ class AppGraphTest {
                 org.xmlpull.v1.XmlPullParser.END_TAG -> inDomain = false
             }
         }
-        assertEquals(Store.hosts, domains)
+        // Full builds also fetch two publisher-pinned launcher releases from gitlab.com.
+        // This does not widen Store.hosts, which protects the signed module registry.
+        val expectedDomains = Store.hosts + if (Store.rules.addOns) setOf("gitlab.com") else emptySet()
+        assertEquals(expectedDomains, domains)
         assertTrue(DownloadHosts.ALL.containsAll(Store.hosts))
         assertTrue("cleartextTrafficPermitted=true" !in attrs && "src=user" !in attrs, attrs.toString())
         assertTrue("src=system" in attrs, attrs.toString())
