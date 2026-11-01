@@ -286,4 +286,15 @@
     <string name="report_issue_error">That isn\'t a link to an issue of this app on GitHub.</string>
     <string name="report_issue_save">Remember it</string>
     <string name="report_issue_open">Open the issue</string>
+    <!-- TV Toolkit: human-reviewed AI import for an unknown Android TV. No execution here. -->
+    <string name="tvtoolkit_ai_title">Ask AI about this TV</string>
+    <string name="tvtoolkit_ai_intro">Copy a ready-made prompt containing the TV model and all package names. Ask your AI assistant which non-essential packages might be disabled. Then paste its reply below for local checking. Nothing is changed on the TV.</string>
+    <string name="tvtoolkit_ai_privacy">The full inventory includes the names of apps you installed. Review it before pasting it into an external AI service. No serial number, IP address or ADB key is included.</string>
+    <string name="tvtoolkit_ai_copy_prompt">Copy full package list and AI prompt</string>
+    <string name="tvtoolkit_ai_format">The reply must look exactly like this (the sample package is not a recommendation):</string>
+    <string name="tvtoolkit_ai_paste">Paste AI reply</string>
+    <string name="tvtoolkit_ai_only_preview">This first version validates suggestions only. It does not execute them.</string>
+    <string name="tvtoolkit_ai_check">Check proposed packages</string>
+    <string name="tvtoolkit_ai_valid">Format and protected-package checks passed. This is only a preview; each change will still need a restore point, a live TV check and your approval.</string>
+    <string name="tvtoolkit_ai_invalid">The reply was rejected. No changes have been made. Check the reasons below and ask AI to correct the list.</string>
 </resources>

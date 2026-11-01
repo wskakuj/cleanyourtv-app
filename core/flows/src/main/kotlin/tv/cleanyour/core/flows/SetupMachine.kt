@@ -1135,6 +1135,20 @@ class SetupMachine(
         val s = session
         if (record == null || s == null) { mutableExtras.update { it.copy(starting = false) }; return }
         mutableExtras.update { it.copy(starting = true) }
+        // TV Toolkit: a successful probe must have produced a durable restore point. For any
+        // Home switch, a TV-side watchdog and a still-enabled stock home are mandatory. A dead
+        // phone cannot undo a lost launcher, so refuse the whole plan before its first write.
+        val baseline = attempt { deps.snapshots.baseline(record.id) }.getOrNull()
+        val safety = RecoveryGate.refusal(baseline, snapshot, plan.steps.map { it.op })
+        if (safety != null) {
+            deps.log.line("setup: recovery preflight refused: ${LogCodes.clean(safety, 160)}")
+            mutableExtras.update { it.copy(starting = false) }
+            send(Ev.Stop(record.id, card(StopCase.PLAN_REFUSED, plan.id).copy(
+                title = "Zabezpieczenie przed awaria",
+                body = safety + " Uruchom analize telewizora ponownie przed kolejna proba.",
+            )))
+            return
+        }
         var pass = given ?: deps.gate.cached(record.id)
         if (pass == null && GateKeeper.needsPass(plan)) {
             effect(SetupEffect.RequestCredential)

@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import tv.cleanyour.core.flows.ReportIntent
 import tv.cleanyour.core.flows.ReportKind
 import tv.cleanyour.core.flows.SentReports
+import tv.cleanyour.core.flows.AiReview
 import tv.cleanyour.ui.design.component.CytTextField
 import tv.cleanyour.ui.design.component.LinkRow
 import tv.cleanyour.ui.design.component.TertiaryButton
@@ -93,6 +94,26 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                     else -> R.string.report_in_link_hint
                 }
                 Body(stringResource(hint), Modifier.padding(top = 16.dp, start = 4.dp, end = 4.dp))
+                if (tvReport && state.aiPrompt.isNotEmpty()) {
+                    Gap(20.dp)
+                    SectionLabel(stringResource(R.string.tvtoolkit_ai_title))
+                    Body(stringResource(R.string.tvtoolkit_ai_intro), Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
+                    Banner(stringResource(R.string.tvtoolkit_ai_privacy), BannerTone.INFO, Modifier.padding(top = 12.dp), icon = CytIcons.Info)
+                    SecondaryButton(stringResource(R.string.tvtoolkit_ai_copy_prompt), { onIntent(ReportIntent.CopyAiPrompt) }, Modifier.padding(top = 12.dp))
+                    Body(stringResource(R.string.tvtoolkit_ai_format), Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp))
+                    MonospaceBlock(listOf(AiReview.HEADER, "BRAND=SHARP", "MODEL=AQUOS_TVE19A", "DISABLE=com.example.retaildemo", AiReview.END), wrap = true)
+                    var aiAnswer by rememberSaveable { mutableStateOf("") }
+                    CytTextField(aiAnswer, { aiAnswer = it.take(20_000) }, stringResource(R.string.tvtoolkit_ai_paste), Modifier.padding(top = 12.dp),
+                        singleLine = false, supporting = stringResource(R.string.tvtoolkit_ai_only_preview))
+                    SecondaryButton(stringResource(R.string.tvtoolkit_ai_check), { onIntent(ReportIntent.PreviewAi(aiAnswer)) }, Modifier.padding(top = 8.dp),
+                        enabled = aiAnswer.isNotBlank())
+                    state.aiPreview?.let { preview ->
+                        Banner(stringResource(if (preview.valid) R.string.tvtoolkit_ai_valid else R.string.tvtoolkit_ai_invalid),
+                            if (preview.valid) BannerTone.SUCCESS else BannerTone.INFO, Modifier.padding(top = 12.dp))
+                        if (preview.packages.isNotEmpty()) MonospaceBlock(preview.packages.map { it.value }, wrap = true)
+                        if (preview.problems.isNotEmpty()) MonospaceBlock(preview.problems.take(25), wrap = true)
+                    }
+                }
                 Gap(16.dp)
             }
         }

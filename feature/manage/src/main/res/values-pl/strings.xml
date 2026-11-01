@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="tvtoolkit_ai_title">Zapytaj AI o ten telewizor</string>
+    <string name="tvtoolkit_ai_intro">Skopiuj gotowy prompt zawierający model telewizora i wszystkie nazwy pakietów. Zapytaj AI, które zbędne pakiety można rozważyć do wyłączenia, a następnie wklej odpowiedź poniżej. Nic nie zostanie zmienione na telewizorze.</string>
+    <string name="tvtoolkit_ai_privacy">Pełna lista zawiera również nazwy Twoich aplikacji. Sprawdź ją przed udostępnieniem AI. Nie zawiera numeru seryjnego, adresu IP ani klucza ADB.</string>
+    <string name="tvtoolkit_ai_copy_prompt">Kopiuj listę pakietów i gotowy prompt</string>
+    <string name="tvtoolkit_ai_format">Odpowiedź musi mieć dokładnie taki format (przykładowy pakiet nie jest rekomendacją):</string>
+    <string name="tvtoolkit_ai_paste">Wklej odpowiedź AI</string>
+    <string name="tvtoolkit_ai_only_preview">Na razie sprawdzamy propozycje. Ten ekran nie wykonuje żadnych zmian.</string>
+    <string name="tvtoolkit_ai_check">Sprawdź proponowane pakiety</string>
+    <string name="tvtoolkit_ai_valid">Format i lista pakietów chronionych przeszły kontrolę. To tylko podgląd. Przed zmianami będzie potrzebna kopia, ponowna analiza TV i Twoja zgoda.</string>
+    <string name="tvtoolkit_ai_invalid">Odpowiedź została odrzucona. Nic nie zmieniono. Sprawdź powody poniżej i poproś AI o poprawienie listy.</string>
+</resources>

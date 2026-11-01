@@ -2,7 +2,10 @@ package tv.cleanyour.core.flows
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import tv.cleanyour.core.model.Profile
+import tv.cleanyour.core.model.Snapshot
 import tv.cleanyour.core.model.TvId
+import tv.cleanyour.core.spec.ProfileResolution
 
 // 0.3.2 B1 and B2: the report preview. "Help add this TV" (TV) is the TV report for a TV with no exact
 // profile; "Report a problem" (PROBLEM) is the redacted diagnostics log with a short TV summary. Both
@@ -39,6 +42,9 @@ data class ReportState(
     // text is not a link to an issue of this app.
     val sent: SentReport? = null,
     val issueError: Boolean = false,
+    // TV Toolkit: opt-in, offline AI-assisted review. A suggestion cannot itself write to a TV.
+    val aiPrompt: String = "",
+    val aiPreview: AiReview.Preview? = null,
 )
 
 sealed interface ReportIntent {
@@ -47,6 +53,8 @@ sealed interface ReportIntent {
     // 0.4.7: the issue the TV report went to, pasted by the person; empty forgets it.
     data class SaveIssue(val url: String) : ReportIntent
     data object OpenIssue : ReportIntent
+    data object CopyAiPrompt : ReportIntent
+    data class PreviewAi(val text: String) : ReportIntent
 }
 
 class ReportMachine(
@@ -57,15 +65,20 @@ class ReportMachine(
 ) : Machine<ReportState, ReportIntent, ManageEffect>(ReportState(kind), scope) {
 
     private data class Loaded(val text: String, val url: String, val available: Boolean, val inLink: Boolean = false, val share: String = "", val shortened: Boolean = false,
-                              val sent: SentReport? = null)
+                              val sent: SentReport? = null, val aiPrompt: String = "")
     private data class Sent(val r: SentReport?, val error: Boolean = false)
+    private data class AiPreviewed(val preview: AiReview.Preview)
+
+    private var aiSnapshot: Snapshot? = null
+    private var aiProfile: Profile? = null
 
     init { scope.launch { send(build(kind)) } }
 
     override fun reduce(state: ReportState, event: Any): ReportState = when (event) {
         is Loaded -> state.copy(loading = false, text = event.text, url = event.url, available = event.available, inLink = event.inLink, shareText = event.share,
-            shortened = event.shortened, sent = event.sent)
+            shortened = event.shortened, sent = event.sent, aiPrompt = event.aiPrompt)
         is Sent -> state.copy(sent = event.r ?: state.sent, issueError = event.error)
+        is AiPreviewed -> state.copy(aiPreview = event.preview)
         else -> state
     }
 
@@ -78,6 +91,11 @@ class ReportMachine(
             ReportIntent.Share -> { effect(ManageEffect.Share(after.shareText.ifEmpty { after.text })); remember(); told() }
             is ReportIntent.SaveIssue -> scope.launch { saveIssue(event.url) }
             ReportIntent.OpenIssue -> after.sent?.issueUrl?.let { effect(ManageEffect.OpenUrl(it)) }
+            ReportIntent.CopyAiPrompt -> if (after.kind == ReportKind.TV && after.aiPrompt.isNotEmpty()) effect(ManageEffect.Copy(after.aiPrompt))
+            is ReportIntent.PreviewAi -> if (after.kind == ReportKind.TV) {
+                val snap = aiSnapshot
+                if (snap != null) scope.launch { send(AiPreviewed(AiReview.parse(event.text, snap, aiProfile))) }
+            }
             else -> {}
         }
     }
@@ -120,7 +138,10 @@ class ReportMachine(
             else -> {
                 val compact = TvReport.compact(input)
                 val link = IssueLinks.tvSupport(input, compact)
-                Loaded(compact, link.url, true, link.reportInLink, share = TvReport.text(input), sent = tvId?.let { id -> attempt { d.sentReports.load(id) }.getOrNull() })
+                aiSnapshot = input.snapshot
+                aiProfile = (input.profile as? ProfileResolution.Exact)?.profile
+                Loaded(compact, link.url, true, link.reportInLink, share = TvReport.text(input), sent = tvId?.let { id -> attempt { d.sentReports.load(id) }.getOrNull() },
+                    aiPrompt = AiReview.prompt(input.snapshot))
             }
         }
         // 0.4.8: the confirmation block (TvReport.confirmation) in the confirmation form; none before a restart counted.
