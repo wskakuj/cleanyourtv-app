@@ -35,6 +35,7 @@ import tv.cleanyour.core.model.DebugState
 import tv.cleanyour.core.model.ApkInfo
 import tv.cleanyour.core.model.DeviceFacts
 import tv.cleanyour.core.model.Endpoint
+import tv.cleanyour.core.model.FileRoute
 import tv.cleanyour.core.model.LauncherState
 import tv.cleanyour.core.model.Level
 import tv.cleanyour.core.model.Op
@@ -1820,8 +1821,22 @@ class SetupMachine(
             val planned = deps.runner.plan(record, request, current)
             val plan = (planned as? PlanResult.Ok)?.plan
                 ?: return fail("The TV refused the installation plan. No launcher was changed.")
-            if (plan.steps.none { it.op is Op.Install || it.op is Op.InstallStream } ||
-                plan.steps.any { it.op !is Op.Install && it.op !is Op.InstallStream && it.op != Op.PressHome }) {
+            // Older ADB implementations install a temporary file instead of streaming the APK.
+            // Allow only that exact verified file in TMP; no settings, launcher takeover,
+            // package disables or other device changes may enter this independent plan.
+            val uploaded = plan.steps.mapNotNull { (it.op as? Op.PushAsset)?.dest }.singleOrNull()
+            val safeSteps = plan.steps.all { step -> when (val op = step.op) {
+                is Op.InstallStream -> op.blob == blob && op.sha256 == pin.artifact.sha256 &&
+                    op.pkg == pin.pkg && op.signer == pin.artifact.signer
+                is Op.Install -> uploaded != null && op.apk == uploaded && op.apk.dir == RemoteDir.TMP &&
+                    op.sha256 == pin.artifact.sha256 && op.pkg == pin.pkg && op.signer == pin.artifact.signer
+                is Op.Mkdir -> op.dir == RemoteDir.TMP
+                is Op.PushAsset -> op.src == blob && op.sha256 == pin.artifact.sha256 && op.dest.dir == RemoteDir.TMP && op.route == FileRoute.SYNC
+                is Op.RemoveFile -> uploaded != null && op.path == uploaded && op.route == FileRoute.SYNC
+                Op.PressHome -> true
+                else -> false
+            } }
+            if (!safeSteps || plan.steps.count { it.op is Op.Install || it.op is Op.InstallStream } != 1) {
                 return fail("The installation plan included an unexpected action; it was stopped.")
             }
             RecoveryGate.refusal(baseline, current, plan.steps.map { it.op })?.let { return fail(it) }
