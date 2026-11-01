@@ -1203,6 +1203,9 @@ class SetupMachine(
         // put a restore-point file on the box itself, not just in phone storage. A failed
         // ADB push stops this plan before the first package is changed.
         if (profile()?.id == TvToolkitProfiles.CANAL_ID && plan.steps.any { it.op is Op.Disable }) {
+            // The restore-point transfer itself touches ADB; the background session guard
+            // must still switch debugging off if Setup cannot reach the main plan afterward.
+            deps.sessionEnd.touched(record.id)
             val saved = attempt { deps.restorePoint.writeVerified(record, s, profile()) }.getOrDefault(false)
             if (!saved) {
                 deps.log.line("setup: CANAL+ restore point could not be saved; no packages disabled")
