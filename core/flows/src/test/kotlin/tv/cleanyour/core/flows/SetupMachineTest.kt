@@ -1387,7 +1387,14 @@ class SetupMachineTest {
             h.sessions.allowPromptFor[HOST] = "AB:CD:7F:2A"
             h.prober.snapshotFor = { r ->
                 Samples.miTvSnapshot(reason = r).let { s ->
-                    s.copy(home = s.home.copy(claimants = s.home.claimants + tv.cleanyour.core.model.HomeClaimant(claimant, 1)))
+                    // The fixture is captured after debloat, with stock Home disabled. This
+                    // test checks how a failed switch classifies FallbackHome, so enable
+                    // stock Home first: RecoveryGate must refuse an unsafe starting state.
+                    val stock = Samples.stockLauncher.pkg
+                    s.copy(
+                        packages = s.packages + (stock to s.packages.getValue(stock).copy(enabled = tv.cleanyour.core.model.EnabledState.ENABLED)),
+                        home = s.home.copy(claimants = s.home.claimants + tv.cleanyour.core.model.HomeClaimant(claimant, 1)),
+                    )
                 }
             }
             h.setupPlan = h.plan(listOf(Op.Disable(adPkg)), takeover = true)
