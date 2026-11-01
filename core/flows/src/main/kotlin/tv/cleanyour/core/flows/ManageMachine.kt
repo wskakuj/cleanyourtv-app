@@ -58,6 +58,9 @@ data class TvCard(
     // before the first read on a path (a TV never switched has none).
     val restarts: RestartTally? = null,
     val activeHome: String? = null,
+    val disabledTotal: Int = 0,
+    val brand: String? = null,
+    val model: String? = null,
 )
 
 data class ManageState(
@@ -149,7 +152,8 @@ class ManageMachine(
                         id = tv.id, name = tv.nickname, room = tv.room, clean = off > 0, checkedAtMs = tv.lastSeenAt, level = tv.level,
                         chip = chipFor(states[tv.id]?.takeIf { d.access.live(tv.id) != null }, run, tv.debugging),
                         thumbnail = state.value.cards.firstOrNull { it.id == tv.id }?.thumbnail,
-                        switchedOff = maxOf(off, latest?.packages?.count { (_, state) -> state.enabled == EnabledState.DISABLED || state.enabled == EnabledState.DISABLED_USER } ?: 0),
+                        switchedOff = off,
+                        disabledTotal = maxOf(off, latest?.packages?.count { (_, state) -> state.enabled == EnabledState.DISABLED || state.enabled == EnabledState.DISABLED_USER } ?: 0),
                         dockNames = home?.let { shownDock(it) }.orEmpty().map { d.nameOf(it) },
                         restorePointAtMs = (d.snapshots.baseline(tv.id) ?: latest)?.takenAtMs, debugging = tv.debugging,
                         helpAddTv = tv.profileId == null && latest != null,
@@ -163,6 +167,7 @@ class ManageMachine(
                         homeHelperOn = d.homeHelper && latest != null && HomeHelper.state(latest) == HomeHelper.State.ON,
                         restarts = attempt { d.restarts.load(tv.id) }.getOrNull()?.takeIf { it.path != null },
                         activeHome = latest?.home?.resolved?.pkg?.value,
+                        brand = tv.facts.brand, model = tv.facts.model,
                     )
                 }
                 send(Loaded(cards))

@@ -81,7 +81,7 @@ class SwitchedOffMachine(
         if (after.busy != null && event is SwitchedOffIntent && event !is SwitchedOffIntent.Refresh) return
         when (event) {
             is SwitchedOffIntent.PutBack -> if (event.pkg !in externalDisabled) change(event.pkg, PlanRequest.PutBack(event.pkg), SnackKind.PUT_BACK, undo = !keptOn(event.pkg) && event.pkg !in advised)
-            is SwitchedOffIntent.ConfirmExternalPutBack -> if (event.pkg in externalDisabled) change(event.pkg, PlanRequest.PutBack(event.pkg), SnackKind.PUT_BACK, undo = false)
+            is SwitchedOffIntent.ConfirmExternalPutBack -> if (before.fresh && event.pkg in externalDisabled) change(event.pkg, PlanRequest.PutBack(event.pkg), SnackKind.PUT_BACK, undo = false)
             is SwitchedOffIntent.Undo -> if (!keptOn(event.pkg) && event.pkg !in externalDisabled) change(event.pkg, PlanRequest.SwitchOff(setOf(event.pkg)), SnackKind.SWITCHED_OFF, undo = false)
             is SwitchedOffIntent.SetOff -> if (event.off) { if (!keptOn(event.pkg)) change(event.pkg, PlanRequest.SwitchOff(setOf(event.pkg)), SnackKind.SWITCHED_OFF, undo = false) }
                 else change(event.pkg, PlanRequest.PutBack(event.pkg), SnackKind.PUT_BACK, undo = false)
@@ -117,7 +117,7 @@ class SwitchedOffMachine(
         val off = d.ledger.switchedOffByUs(tvId)
         val profile = d.profileOf(tv)
         // The full inventory is read from the TV when reachable, not inferred from our journal.
-        val session = if (refresh) (d.access.session(tvId) as? AccessResult.Ok)?.session else d.access.live(tvId)
+        val session = if (refresh) (d.access.session(tvId) as? AccessResult.Ok)?.session else null
         val fresh = if (session != null) attempt { d.runner.freshSnapshot(session) }.getOrNull() else null
         val latest = fresh ?: d.snapshots.latest(tvId)
         val labels = latest?.packages.orEmpty()

@@ -124,7 +124,7 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
             val checked = msg(R.string.manage_checked, "date" to shortDate(tv.checkedAtMs, locale))
             TvCard(
                 name = if (room != null) msg(R.string.manage_tv_title, "tv" to tv.name, "room" to room) else msg(R.string.manage_tv_title_noroom, "tv" to tv.name),
-                statusLine = "$stateWord. $checked.",
+                statusLine = if (state.toolkitMode) listOfNotNull(tv.brand, tv.model, stateWord, checked).joinToString(" · ") else "$stateWord. $checked.",
                 thumbnail = rememberPng(tv.thumbnail),
                 thumbnailDescription = msg(R.string.manage_thumbnail_cd, "tv" to tv.name),
                 modifier = Modifier.padding(top = 20.dp),
@@ -199,7 +199,8 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
                     ListRow(msg(R.string.manage_row_better_back_on, "count" to tv.betterBackOn), onClick = { onIntent(ManageIntent.Open(ManageSection.SWITCHED_OFF)) })
                     ListDivider()
                 }
-                ListRow(msg(R.string.manage_row_switched_off, "count" to tv.switchedOff), subtitle = stringResource(R.string.manage_row_switched_off_sub),
+                ListRow(msg(R.string.manage_row_switched_off, "count" to tv.switchedOff),
+                    subtitle = if (state.toolkitMode) stringResource(R.string.tvtoolkit_disabled_summary, tv.switchedOff, tv.disabledTotal) else stringResource(R.string.manage_row_switched_off_sub),
                     onClick = { onIntent(ManageIntent.Open(ManageSection.SWITCHED_OFF)) })
                 ListDivider()
                 ListRow(stringResource(R.string.manage_row_leftovers), subtitle = stringResource(R.string.manage_row_leftovers_sub),
@@ -387,7 +388,7 @@ fun SwitchedOffScreen(state: SwitchedOffState, onIntent: (SwitchedOffIntent) -> 
                     if (i > 0) ListDivider()
                     ListRow(row.name, subtitle = row.pkg.value, trailing = {
                         TertiaryButton(stringResource(R.string.tvtoolkit_external_enable),
-                            { pendingExternal = row.pkg.value }, enabled = state.busy == null)
+                            { pendingExternal = row.pkg.value }, enabled = state.fresh && state.busy == null)
                     })
                 }
             }

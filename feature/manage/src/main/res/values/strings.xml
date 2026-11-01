@@ -346,4 +346,6 @@
     <string name="tvtoolkit_inventory_refresh">Refresh actual TV state</string>
     <string name="tvtoolkit_disabled_summary">Disabled by this app: %1$d. Disabled on this TV overall: %2$d.</string>
     <string name="tvtoolkit_choices_toggle">Optional launcher, media apps and wallpaper choices</string>
+    <string name="tvtoolkit_ai_batch">Choose at most 5 packages per batch, then reboot and test the TV before more changes.</string>
+    <string name="tvtoolkit_ai_show_prompt">Show the data that will be copied</string>
 </resources>

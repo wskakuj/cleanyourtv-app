@@ -128,7 +128,7 @@ object AiReview {
                 "DISABLE", "KEEP" -> {
                     val pkg = value.substringBefore("|")
                     val why = value.substringAfter("|", missingDelimiterValue = "")
-                    if (!PACKAGE_RE.matches(pkg) || pkg.length > 255 || why.length !in 8..180 || "|" in why) {
+                    if ((pkg != "android" && !PACKAGE_RE.matches(pkg)) || pkg.length > 255 || why.length !in 8..180 || "|" in why) {
                         problems += "Niepoprawny wiersz $name: ${value.take(80)}"
                     } else {
                         val target = if (name == "DISABLE") requested else kept
@@ -171,7 +171,7 @@ object AiReview {
             if (reason != null) problems += "$name: $reason" else allowed += pkg
         }
         kept.keys.take(MAX_KEEP).forEach { name ->
-            if (!PACKAGE_RE.matches(name) || PackageName(name) !in snapshot.packages) problems += "KEEP odnosi sie do nieobecnego pakietu $name."
+            if ((name != "android" && !PACKAGE_RE.matches(name)) || PackageName(name) !in snapshot.packages) problems += "KEEP odnosi sie do nieobecnego pakietu $name."
         }
         return Preview(allowed, problems, requested.mapKeys { PackageName(it.key) },
             kept.mapKeys { PackageName(it.key) }, noCandidates = none)

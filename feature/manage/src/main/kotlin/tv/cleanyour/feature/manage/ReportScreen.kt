@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package tv.cleanyour.feature.manage
 
 import androidx.compose.foundation.layout.padding
@@ -59,6 +61,7 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
     var aiSelected by remember { mutableStateOf(setOf<String>()) }
     var aiConfirm by remember { mutableStateOf(false) }
     var showOptional by rememberSaveable { mutableStateOf(false) }
+    var showPrompt by rememberSaveable { mutableStateOf(false) }
     var launcher by rememberSaveable { mutableStateOf(0) }
     var youtube by rememberSaveable { mutableStateOf(0) }
     var media by rememberSaveable { mutableStateOf(0) }
@@ -92,6 +95,8 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                     Body(stringResource(R.string.tvtoolkit_ai_intro), Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
                     Banner(stringResource(R.string.tvtoolkit_ai_privacy), BannerTone.INFO, Modifier.padding(top = 12.dp), icon = CytIcons.Info)
                     SecondaryButton(stringResource(R.string.tvtoolkit_ai_copy_prompt), { onIntent(ReportIntent.CopyAiPrompt) }, Modifier.padding(top = 12.dp))
+                    TertiaryButton(stringResource(R.string.tvtoolkit_ai_show_prompt), { showPrompt = !showPrompt }, Modifier.padding(top = 8.dp))
+                    if (showPrompt) MonospaceBlock(state.aiPrompt.lines(), wrap = true)
                     Body(stringResource(R.string.tvtoolkit_ai_format), Modifier.padding(top = 12.dp, start = 4.dp, end = 4.dp))
                     MonospaceBlock(state.aiExample.lines(), wrap = true)
                     var aiAnswer by rememberSaveable { mutableStateOf("") }
@@ -99,7 +104,7 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                         singleLine = false, supporting = stringResource(R.string.tvtoolkit_ai_only_preview))
                     SecondaryButton(stringResource(R.string.tvtoolkit_ai_check), { aiSelected = emptySet(); onIntent(ReportIntent.PreviewAi(aiAnswer)) }, Modifier.padding(top = 8.dp),
                         enabled = aiAnswer.isNotBlank())
-                    state.aiPreview?.let { preview ->
+                    state.aiPreview?.takeIf { state.aiCheckedText == aiAnswer }?.let { preview ->
                         Banner(stringResource(if (preview.valid) R.string.tvtoolkit_ai_valid else R.string.tvtoolkit_ai_invalid),
                             if (preview.valid) BannerTone.SUCCESS else BannerTone.INFO, Modifier.padding(top = 12.dp))
                         if (preview.noCandidates && preview.valid) Body(stringResource(R.string.tvtoolkit_ai_none), Modifier.padding(top = 8.dp))
@@ -110,7 +115,8 @@ fun ReportScreen(state: ReportState, onIntent: (ReportIntent) -> Unit, onBack: (
                                     { selected -> aiSelected = if (selected) aiSelected + pkg.value else aiSelected - pkg.value },
                                     subtitle = preview.why[pkg], enabled = !state.aiApplying && !state.aiApplied)
                             }
-                            if (aiSelected.isNotEmpty() && preview.valid && !state.aiApplied) {
+                            if (aiSelected.size > 5) Body(stringResource(R.string.tvtoolkit_ai_batch), Modifier.padding(top = 8.dp))
+                            if (aiSelected.isNotEmpty() && aiSelected.size <= 5 && preview.valid && !state.aiApplied) {
                                 PrimaryButton(stringResource(R.string.tvtoolkit_ai_apply), { aiConfirm = true },
                                     Modifier.padding(top = 16.dp), enabled = !state.aiApplying)
                             }

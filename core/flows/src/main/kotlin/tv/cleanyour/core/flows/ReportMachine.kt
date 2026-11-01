@@ -53,6 +53,7 @@ data class ReportState(
     val aiPreview: AiReview.Preview? = null,
     val toolkitProfileName: String? = null,
     val aiExample: String = "",
+    val aiCheckedText: String = "",
     val aiApplying: Boolean = false,
     val aiOutcome: String? = null,
     val aiApplied: Boolean = false,
@@ -80,7 +81,7 @@ class ReportMachine(
     private data class Loaded(val text: String, val url: String, val available: Boolean, val inLink: Boolean = false, val share: String = "", val shortened: Boolean = false,
                               val sent: SentReport? = null, val aiPrompt: String = "", val aiExample: String = "", val toolkitProfileName: String? = null)
     private data class Sent(val r: SentReport?, val error: Boolean = false)
-    private data class AiPreviewed(val preview: AiReview.Preview)
+    private data class AiPreviewed(val preview: AiReview.Preview, val text: String)
     private data class AiApplyUpdate(val busy: Boolean, val status: String?, val succeeded: Boolean = false)
 
     private var aiSnapshot: Snapshot? = null
@@ -94,7 +95,7 @@ class ReportMachine(
         is Loaded -> state.copy(loading = false, text = event.text, url = event.url, available = event.available, inLink = event.inLink, shareText = event.share,
             shortened = event.shortened, sent = event.sent, aiPrompt = event.aiPrompt, aiExample = event.aiExample, toolkitProfileName = event.toolkitProfileName)
         is Sent -> state.copy(sent = event.r ?: state.sent, issueError = event.error)
-        is AiPreviewed -> state.copy(aiPreview = event.preview, aiOutcome = null, aiApplied = false)
+        is AiPreviewed -> state.copy(aiPreview = event.preview, aiCheckedText = event.text, aiOutcome = null, aiApplied = false)
         is AiApplyUpdate -> state.copy(aiApplying = event.busy, aiOutcome = event.status, aiApplied = event.succeeded)
         else -> state
     }
@@ -115,7 +116,7 @@ class ReportMachine(
             is ReportIntent.PreviewAi -> if (after.kind == ReportKind.TV && !after.aiApplying) {
                 reviewedText = event.text
                 val snap = aiSnapshot
-                if (snap != null) scope.launch { send(AiPreviewed(AiReview.parse(event.text, snap, aiProfile))) }
+                if (snap != null) scope.launch { send(AiPreviewed(AiReview.parse(event.text, snap, aiProfile), event.text)) }
             }
             is ReportIntent.ApplyAi -> if (after.kind == ReportKind.TV && !after.aiApplying && !aiRunActive && after.aiPreview?.valid == true && event.selected.isNotEmpty()) {
                 aiRunActive = true
@@ -129,6 +130,7 @@ class ReportMachine(
     private suspend fun applyAi(selected: Set<PackageName>) {
         send(AiApplyUpdate(true, null))
         val result = attempt {
+            if (selected.size > 5) return@attempt "Wylaczaj najwyzej 5 aplikacji naraz, potem wykonaj restart i test funkcji TV."
             val id = tvId ?: return@attempt "Nie wybrano telewizora."
             val tv = d.tv(id) ?: return@attempt "Nie znaleziono zapisanego telewizora."
             val text = reviewedText ?: return@attempt "Najpierw zweryfikuj odpowiedz AI."
