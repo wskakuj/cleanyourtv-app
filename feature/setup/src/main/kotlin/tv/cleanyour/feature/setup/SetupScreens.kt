@@ -439,6 +439,7 @@ internal fun keptReason(kept: HomeKept.Blocked): String = when (kept.block) {
     HomeBlock.TV_REFUSES -> if (kept.fireTv) stringResource(R.string.kept_reason_fire_tv) else msg(R.string.kept_reason_tv_refuses, "brand" to kept.brand)
     HomeBlock.OLD_ANDROID -> stringResource(R.string.kept_reason_old_android)
     HomeBlock.UNKNOWN_HOME -> stringResource(R.string.kept_reason_unknown_home)
+    HomeBlock.OPERATOR_HOME -> stringResource(R.string.kept_reason_operator_home)
     HomeBlock.WIZARD_WIFI -> stringResource(R.string.kept_reason_wizard_wifi)
     HomeBlock.WIZARD_WIFI_UNKNOWN -> stringResource(R.string.kept_reason_wizard_wifi_unknown)
     HomeBlock.CASTING -> stringResource(R.string.kept_reason_casting)
@@ -461,6 +462,7 @@ internal fun ColumnScope.WhyKeptContent(kept: HomeKept.Blocked, onOpenUrl: (Stri
         HomeBlock.TV_REFUSES -> if (kept.fireTv) stringResource(R.string.found_home_fire_tv) else msg(R.string.found_home_tv_refuses, "brand" to kept.brand)
         HomeBlock.OLD_ANDROID -> stringResource(R.string.found_home_old_android)
         HomeBlock.UNKNOWN_HOME -> stringResource(R.string.found_home_unknown_stock)
+        HomeBlock.OPERATOR_HOME -> stringResource(R.string.found_home_operator)
         HomeBlock.HOME_CHANGED -> stringResource(R.string.found_home_changed)
         // A TV no exact profile knows keeps its wizard on whoever saved the Wi-Fi, so the
         // "forget the network" advice would not help there.
@@ -481,6 +483,7 @@ internal fun ColumnScope.WhyKeptContent(kept: HomeKept.Blocked, onOpenUrl: (Stri
         kept.block == HomeBlock.WIZARD_WIFI -> R.string.kept_next_wifi
         kept.block == HomeBlock.WIZARD_WIFI_UNKNOWN -> R.string.kept_next_wifi_unknown
         kept.block == HomeBlock.HOME_CHANGED -> R.string.kept_next_home_changed
+        kept.block == HomeBlock.OPERATOR_HOME -> R.string.kept_next_operator
         kept.block == HomeBlock.OTHER_HOME -> R.string.kept_next_other_home
         kept.block == HomeBlock.PATCHWALL_FEEDS -> R.string.kept_next_patchwall_feeds
         kept.block == HomeBlock.NONE || kept.block == HomeBlock.UNKNOWN_HOME || kept.block == HomeBlock.WIZARD_STAYS_ON -> null

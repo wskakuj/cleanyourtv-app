@@ -54,6 +54,50 @@ class TvToolkitProfilesTest {
         assertNull(TvToolkitProfiles.exact(real.copy(model = "TPM191F")))
     }
 
+    @Test fun canalBoxOnlyMatchesTheReportedFirmwareAndKeepsOperatorHome() = runBlocking {
+        val real = sample.copy(brand = "CANAL-PLUS", manufacturer = "SkyworthDigital",
+            model = "CANAL PLUS BOX", device = "HY40A2", sdk = 29,
+            fingerprint = "CANAL-PLUS/HY4001/HY40A2:10/QTT8.201201.002/C3.0.8_20220628:user/release-keys")
+        val operator = Component(PackageName("com.canal.box"), ".ui.boot.BoxMainActivity")
+        val fallback = Component(PackageName("com.android.tv.settings"), ".system.FallbackHome")
+        val home = HomeResolution(operator, listOf(HomeClaimant(operator, 2), HomeClaimant(fallback, -1000)))
+        val exact = assertIs<ProfileResolution.Exact>(source.resolve(real, home))
+        assertEquals(TvToolkitProfiles.CANAL_ID, exact.profile.id)
+        assertEquals(operator, exact.profile.stockLaunchers.single())
+        assertNull(exact.profile.setupWraith)
+        assertNull(exact.profile.liveTv)
+        assertNull(exact.profile.tested) // report-only, not certified by a successful reboot
+        assertNull(TvToolkitProfiles.exact(real.copy(device = "HY40A3")))
+        assertNull(TvToolkitProfiles.exact(real.copy(model = "OTHER BOX")))
+        assertNull(TvToolkitProfiles.exact(real.copy(brand = "Other", manufacturer = "Other")))
+        assertNull(TvToolkitProfiles.exact(real.copy(sdk = 28)))
+        assertNull(TvToolkitProfiles.exact(real.copy(sdk = 30)))
+        assertNull(TvToolkitProfiles.exact(real.copy(fingerprint = real.fingerprint.replace("C3.0.8", "C3.0.9"))))
+        val googleTv = KnownLaunchers.LAUNCHERX
+        val wrongHome = HomeResolution(googleTv, listOf(HomeClaimant(googleTv, 2)))
+        val resolved = source.resolve(real, wrongHome)
+        assertFalse(resolved is ProfileResolution.Exact && resolved.profile.id == TvToolkitProfiles.CANAL_ID)
+    }
+
+    @Test fun canalProtectsAllObservedSystemPackagesExceptThreeUserOptInApps() {
+        val profile = TvToolkitProfiles.canal
+        val suggested = profile.groups.flatMap { it.packages.map { p -> p.name.value } }.toSet()
+        assertEquals(93, TvToolkitProfiles.canalObservedSystemPackages.size)
+        assertEquals(TvToolkitProfiles.canalOptional, suggested)
+        assertEquals(3, suggested.size)
+        assertTrue(profile.groups.all { it.default == GroupDefault.ASK })
+        assertTrue((TvToolkitProfiles.canalObservedSystemPackages - suggested).all {
+            PackageName(it) in profile.neverDisable
+        })
+        assertTrue(suggested.none { PackageName(it) in profile.neverDisable })
+        for (critical in listOf("com.canal.box", "pl.canalplus.tvod.atv",
+                "com.skyworthdigital.stb.ncplus", "com.skyworthdigital.ncplusrcuota",
+                "com.skyworthdigital.ncplusbtservice", "com.google.android.gms",
+                "com.android.tv.settings", "com.google.android.tv.remote.service")) {
+            assertTrue(PackageName(critical) in profile.neverDisable, critical)
+        }
+    }
+
     @Test fun aGoogleTvHomeNeverGetsOurAndroidTvSpecificProfile() = runBlocking {
         val real = sample.copy(brand = "Sharp", manufacturer = "SHARP", model = "AQUOS_TVE19A",
             device = "sindang", sdk = 30, fingerprint = "SHARP/tcbrae_a/sindang:11/RTOB.250721.001/13808904:user/release-keys")
@@ -64,7 +108,7 @@ class TvToolkitProfilesTest {
     }
 
     @Test fun allCuratedPackagesRequireExplicitChoiceAndExcludeCriticalServices() {
-        assertEquals(2, TvToolkitProfiles.all.size)
+        assertEquals(3, TvToolkitProfiles.all.size)
         TvToolkitProfiles.all.forEach { profile ->
             assertTrue(profile.groups.isNotEmpty())
             assertTrue(profile.groups.all { it.default == GroupDefault.ASK }, profile.id)

@@ -11,6 +11,7 @@ import tv.cleanyour.core.model.Snapshot
 import tv.cleanyour.core.ops.Denylist
 import tv.cleanyour.core.ops.HomePlaceholder
 import tv.cleanyour.core.spec.KnownLaunchers
+import tv.cleanyour.core.spec.TvToolkitProfiles
 
 // RF-SAFETY-250, owner decisions for 0.2.0: TVs where the home screen switch is skipped up front, so
 // Setup is the clean-up alone (like RF-PROFILES-63 P1 and P2). SetupMachine asks before it plans and
@@ -38,6 +39,9 @@ object HomeSwitchRisk {
         // Upstream's own install keeps launcherx on with a key helper, and this app never switches an
         // accessibility service on, so there is no switch.
         REMOTE_BUTTONS("on this TV the remote's app buttons only work through its own home screen, so with it switched off they stop working"),
+        // The CANAL+ operator app is this box's own Home and service hub. Even a matched profile
+        // is not evidence that replacing it preserves subscription, live TV and activation.
+        OPERATOR_HOME("CANAL+ BOX uses its operator's home screen for TV services; the original Home remains enabled and in charge"),
         // beta3: R0 would let the switch go ahead with the wizard left on, but another home screen app
         // claims Home (one the person installed that R0 cannot take, or a vendor home), so it does not.
         OTHER_HOME("another home screen app claims the Home button on this TV, so the switch is left alone while its setup wizard stays on"),
@@ -175,6 +179,7 @@ object HomeSwitchRisk {
         isMokaFamily(facts) || profile?.id in MOKA_PROFILES -> Risk.BOOT_LOOP
         isGoogleHardware(facts) || profile?.id in CASTING_PROFILES -> Risk.CASTING
         profile?.id in REMOTE_BUTTON_PROFILES -> Risk.REMOTE_BUTTONS
+        profile?.id == TvToolkitProfiles.CANAL_ID -> Risk.OPERATOR_HOME
         // beta4: a FallbackHome R0 does not take (r0Placeholder) holds the switch back on every path.
         vendorPlaceholderClaims(snapshot) -> Risk.VENDOR_HOME
         PatchWallFeeds.stayingOff(snapshot, journals, patchWallGoesOff).isNotEmpty() -> Risk.PATCHWALL_FEEDS

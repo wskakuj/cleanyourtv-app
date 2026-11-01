@@ -84,6 +84,7 @@ import tv.cleanyour.core.spec.ProfileResolution
 import tv.cleanyour.core.planner.PatchWallFeeds
 import tv.cleanyour.core.spec.ProfileSource
 import tv.cleanyour.core.spec.ThemeSource
+import tv.cleanyour.core.spec.TvToolkitProfiles
 import tv.cleanyour.core.spec.resolveFor
 import tv.cleanyour.core.registry.ArtifactFetcher
 import tv.cleanyour.core.registry.FetchResult
@@ -122,7 +123,7 @@ enum class ToolkitInstallStage { IDLE, DOWNLOADING, CHECKING, BACKUP, INSTALLING
 // VENDOR_HOME (beta4, issue #825): a system service's FallbackHome claims Home (HomeSwitchRisk).
 // PATCHWALL_FEEDS (beta4, issue #945): PatchWall stays on while Mi TV+ or its web content is off, not by
 // this app (HomeSwitchRisk, PatchWallFeeds).
-enum class HomeBlock { NONE, TV_REFUSES, OLD_ANDROID, UNKNOWN_HOME, WIZARD_WIFI, WIZARD_WIFI_UNKNOWN, CASTING, BOOT_LOOP,
+enum class HomeBlock { NONE, TV_REFUSES, OLD_ANDROID, UNKNOWN_HOME, OPERATOR_HOME, WIZARD_WIFI, WIZARD_WIFI_UNKNOWN, CASTING, BOOT_LOOP,
     WIZARD_STAYS_ON, HOME_CHANGED, REMOTE_BUTTONS, OTHER_HOME, VENDOR_HOME, PATCHWALL_FEEDS }
 
 // Why a run changed nothing, for Done's body (0.3.3): nothing was planned to switch off (on a TV
@@ -932,6 +933,7 @@ class SetupMachine(
             risk == HomeSwitchRisk.Risk.BOOT_LOOP -> HomeBlock.BOOT_LOOP
             risk == HomeSwitchRisk.Risk.CASTING -> HomeBlock.CASTING
             risk == HomeSwitchRisk.Risk.REMOTE_BUTTONS -> HomeBlock.REMOTE_BUTTONS
+            risk == HomeSwitchRisk.Risk.OPERATOR_HOME -> HomeBlock.OPERATOR_HOME
             anotherKey || (stockUnknown && StockHome.changedByPerson(snap, stocks)) -> HomeBlock.HOME_CHANGED
             (p != null && p.stockLaunchers.isEmpty()) || stockUnknown -> HomeBlock.UNKNOWN_HOME
             risk == HomeSwitchRisk.Risk.WIZARD_WIFI -> HomeBlock.WIZARD_WIFI
@@ -1196,6 +1198,21 @@ class SetupMachine(
             effect(SetupEffect.RequestCredential)
             pass = deps.gate.pass(record.id, record.nickname)
             if (pass == null) { mutableExtras.update { it.copy(starting = false) }; return }
+        }
+        // The CANAL+ operator Home remains untouched. Before any opt-in package disable,
+        // put a restore-point file on the box itself, not just in phone storage. A failed
+        // ADB push stops this plan before the first package is changed.
+        if (profile()?.id == TvToolkitProfiles.CANAL_ID && plan.steps.any { it.op is Op.Disable }) {
+            val saved = attempt { deps.restorePoint.writeVerified(record, s, profile()) }.getOrDefault(false)
+            if (!saved) {
+                deps.log.line("setup: CANAL+ restore point could not be saved; no packages disabled")
+                mutableExtras.update { it.copy(starting = false) }
+                send(Ev.Stop(record.id, card(StopCase.PLAN_REFUSED, plan.id).copy(
+                    title = "Nie zapisano punktu przywracania",
+                    body = "Nie udalo sie zapisac kopii na CANAL+ BOX. Niczego nie wylaczono.",
+                )))
+                return
+            }
         }
         mutableExtras.update { it.copy(noScreenLock = deps.gate.noScreenLock(record.id) || it.noScreenLock) }
         earlierRuns.clear()

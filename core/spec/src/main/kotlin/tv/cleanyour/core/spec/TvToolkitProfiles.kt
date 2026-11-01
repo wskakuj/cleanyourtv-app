@@ -25,6 +25,7 @@ import tv.cleanyour.core.model.Sha256
 object TvToolkitProfiles {
     const val SHARP_ID = "tvtoolkit-sharp-aquos-tve19a"
     const val PHILIPS_ID = "tvtoolkit-philips-tpm191e"
+    const val CANAL_ID = "tvtoolkit-canal-plus-hy40a2-c308"
 
     private fun pkg(value: String) = PackageName(value)
     private fun group(id: String, title: String, vararg entries: String): PackageGroup =
@@ -111,7 +112,70 @@ object TvToolkitProfiles {
         sourceSha256 = Sha256("956482e47803e539c98699f66bed819de60cb642ed029217af53ef937b41f47d"),
     )
 
-    val all: List<Profile> = listOf(sharp, philips)
+    /**
+     * CANAL+ BOX HY40A2, exactly the Android 10 C3.0.8_20220628 firmware in the owner's
+     * 2026-11-01 report. The operator's Home, playback, tuner, DRM, pairing, remote, OTA and
+     * Google infrastructure are protected. The other 90 observed system packages are
+     * protected as well: only three nonessential entertainment apps are offered, one by one.
+     * Any other firmware falls back to upstream safety handling, never to this preset.
+     */
+    internal val canalObservedSystemPackages: Set<String> = setOf(
+        "android", "android.autoinstalls.config.skyworthdigital.hy4001", "com.amlogic.multimediaplayer",
+        "com.android.backupconfirm", "com.android.bluetooth", "com.android.bluetoothmidiservice",
+        "com.android.camera2", "com.android.captiveportallogin", "com.android.certinstaller",
+        "com.android.companiondevicemanager", "com.android.cts.ctsshim", "com.android.cts.priv.ctsshim",
+        "com.android.dreams.basic", "com.android.dynsystem", "com.android.externalstorage",
+        "com.android.gallery3d", "com.android.htmlviewer", "com.android.inputdevices",
+        "com.android.keychain", "com.android.localtransport", "com.android.location.fused",
+        "com.android.modulemetadata", "com.android.networkstack.inprocess", "com.android.networkstack.permissionconfig",
+        "com.android.pacprocessor", "com.android.printspooler", "com.android.providers.calendar",
+        "com.android.providers.contacts", "com.android.providers.downloads", "com.android.providers.media",
+        "com.android.providers.settings", "com.android.providers.tv", "com.android.providers.userdictionary",
+        "com.android.proxyhandler", "com.android.se", "com.android.settings.intelligence",
+        "com.android.sharedstoragebackup", "com.android.shell", "com.android.statementservice",
+        "com.android.systemui", "com.android.tv.settings", "com.android.vending",
+        "com.android.vpndialogs", "com.android.wallpaperbackup", "com.canal.box",
+        "com.ctc", "com.droidlogic", "com.droidlogic.ble",
+        "com.droidlogic.droidtvsettingsoverlay", "com.droidlogic.dvbaudioservice", "com.droidlogic.imageplayer",
+        "com.droidlogic.overlay", "com.droidlogic.readlog", "com.droidlogic.tv.settings",
+        "com.google.android.apps.mediashell", "com.google.android.backdrop", "com.google.android.ext.services",
+        "com.google.android.ext.shared", "com.google.android.feedback", "com.google.android.gms",
+        "com.google.android.gsf", "com.google.android.inputmethod.latin", "com.google.android.katniss",
+        "com.google.android.marvin.talkback", "com.google.android.onetimeinitializer", "com.google.android.packageinstaller",
+        "com.google.android.partnersetup", "com.google.android.permissioncontroller", "com.google.android.play.games",
+        "com.google.android.sss.authbridge", "com.google.android.syncadapters.calendar", "com.google.android.tts",
+        "com.google.android.tungsten.setupwraith", "com.google.android.tv.bugreportsender", "com.google.android.tv.frameworkpackagestubs",
+        "com.google.android.tv.remote.service", "com.google.android.tvrecommendations", "com.google.android.videos",
+        "com.google.android.webview", "com.google.android.youtube.tv", "com.google.android.youtube.tvmusic",
+        "com.netflix.ninja", "com.rock.stb", "com.skyworthdigital.ncplus.frontpanelledsservice",
+        "com.skyworthdigital.ncplus.rcu.upgrade.skyboxactivity", "com.skyworthdigital.ncplus.setupwraith", "com.skyworthdigital.ncplusbtservice",
+        "com.skyworthdigital.ncplusrcubatteryservice", "com.skyworthdigital.ncplusrcuota", "com.skyworthdigital.producttest",
+        "com.skyworthdigital.stb.ncplus", "com.skyworthdigital.system.server", "pl.canalplus.tvod.atv"
+    )
+    internal val canalOptional: Set<String> = setOf(
+        "com.google.android.play.games", "com.google.android.youtube.tvmusic", "com.google.android.videos"
+    )
+    val canal: Profile = Profile(
+        id = CANAL_ID,
+        match = ProfileMatch(listOf("CANAL PLUS BOX"), listOf("HY40A2"), "CANAL-PLUS",
+            29, 29, "CANAL-PLUS/HY4001/HY40A2:10/QTT8.201201.002/C3.0.8_20220628:"),
+        platform = Platform.ANDROID_TV,
+        stockLaunchers = listOf(Component(pkg("com.canal.box"), ".ui.boot.BoxMainActivity")),
+        liveTv = null, // Do not guess which operator component implements Live TV.
+        setupWraith = null, // Never touch first-boot or operator activation services.
+        quirks = setOf(Quirk.STOCK_LAUNCHER_KEEP_ENABLED),
+        groups = listOf(
+            group("canal-optional-google", "Opcjonalne aplikacje Google (wybór)",
+                "com.google.android.play.games", "com.google.android.youtube.tvmusic",
+                "com.google.android.videos"),
+        ),
+        neverDisable = mustKeep + (canalObservedSystemPackages - canalOptional).map(::pkg),
+        suggestedDock = emptyList(),
+        tested = null, // Report-only: no tested disable or successful reboot has been observed.
+        sourceSha256 = Sha256("d6206c1899e584619350b1f5698e77d9ea6eae10fa3afc1a6a411c7652590fc5"),
+    )
+
+    val all: List<Profile> = listOf(sharp, philips, canal)
 
     /** Both observed model and device must match; matching by brand or platform alone is unsafe. */
     fun exact(facts: DeviceFacts): Profile? = all.firstOrNull { profile ->
@@ -126,11 +190,11 @@ object TvToolkitProfiles {
     }
 }
 
-/** Adds two strictly matched, opt-in presets without changing existing upstream TV profiles. */
+/** Adds three strictly matched, opt-in presets without changing existing upstream TV profiles. */
 class TvToolkitProfileSource(private val upstream: BundledProfileSource) : HomeAwareProfileSource {
     override suspend fun all(): List<Profile> = upstream.all() + TvToolkitProfiles.all
 
-    /** Preserve the upstream brand sure-sets; our two exact presets never extend them. */
+    /** Preserve the upstream brand sure-sets; our three exact presets never extend them. */
     fun sureSets(): List<SureSet> = upstream.sureSets()
 
     override suspend fun resolve(facts: DeviceFacts): ProfileResolution =

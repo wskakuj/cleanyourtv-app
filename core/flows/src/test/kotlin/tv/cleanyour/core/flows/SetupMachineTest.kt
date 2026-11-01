@@ -140,6 +140,28 @@ class SetupMachineTest {
         assertIs<SetupState.Found>(m.state.value)
     }
 
+    @Test fun canalDebloatRefusesAnyDisableIfTheTvRestorePointCannotBeWritten() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        h.sessions.allowPromptFor[HOST] = "AB:CD:7F:2A"
+        h.profiles.resolver = { _, _ -> tv.cleanyour.core.spec.ProfileResolution.Exact(
+            tv.cleanyour.core.spec.TvToolkitProfiles.canal) }
+        h.planner.respond = { request, _ -> when (request) {
+            is PlanRequest.Setup -> PlanResult.Ok(h.setupPlan)
+            is PlanRequest.WriteRestorePoint -> PlanResult.Refused(listOf("TV storage unavailable"))
+            else -> PlanResult.Refused(listOf("unexpected request"))
+        } }
+        val m = h.setup(backgroundScope)
+        toFound(h, m)
+        assertEquals(HomeBlock.OPERATOR_HOME, m.extras.value.homeBlock)
+        m.dispatch(SetupIntent.MakeItClean)
+        settle()
+        val stopped = assertIs<SetupState.Stopped>(m.state.value)
+        assertEquals(StopCase.PLAN_REFUSED, stopped.card.case)
+        assertTrue(h.planner.requests.any { it is PlanRequest.WriteRestorePoint })
+        assertTrue(h.engine.calls.none { it is FakeEngine.Call.Start }, "no package write may start without a TV restore point")
+        assertTrue(h.logLines.any { "CANAL+ restore point could not be saved" in it })
+    }
+
     @Test fun probeSavesTheBaselineAndRecordsTheTvWithItsDraft() = runTest(timeout = 30.seconds) {
         val h = Harness()
         h.sessions.allowPromptFor[HOST] = "AB:CD:7F:2A"
