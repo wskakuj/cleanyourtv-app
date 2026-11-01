@@ -126,8 +126,11 @@ object TvToolkitProfiles {
 }
 
 /** Adds two strictly matched, opt-in presets without changing existing upstream TV profiles. */
-class TvToolkitProfileSource(private val upstream: HomeAwareProfileSource) : HomeAwareProfileSource {
+class TvToolkitProfileSource(private val upstream: BundledProfileSource) : HomeAwareProfileSource {
     override suspend fun all(): List<Profile> = upstream.all() + TvToolkitProfiles.all
+
+    /** Preserve the upstream brand sure-sets; our two exact presets never extend them. */
+    fun sureSets(): List<SureSet> = upstream.sureSets()
 
     override suspend fun resolve(facts: DeviceFacts): ProfileResolution =
         resolve(facts, null, null)
