@@ -468,4 +468,6 @@
     <string name="helper_consent_off">You can switch it off any time: here, with Undo, or on the TV in Settings &gt; Accessibility &gt; Home button.</string>
     <string name="helper_consent_yes">Switch on the helper</string>
     <string name="helper_consent_no">Not now</string>
+    <string name="tvtoolkit_found_no_selection">Nothing selected to switch off</string>
+    <string name="tvtoolkit_found_choose_optional">The original Home stays in use. Optional packages are available; open Customise to decide whether to disable any. Nothing changes until you approve.</string>
 </resources>

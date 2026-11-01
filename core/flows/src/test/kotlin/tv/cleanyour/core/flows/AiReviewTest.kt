@@ -30,10 +30,8 @@ class AiReviewTest {
     }
 
     private fun answer(vararg packages: String) = buildString {
-        appendLine(AiReview.HEADER)
-        appendLine("BRAND=SHARP")
-        appendLine("MODEL=AQUOS_TVE19A")
-        packages.forEach { appendLine("DISABLE=$it") }
+        AiReview.example(snapshot).lines().take(6).forEach { appendLine(it) }
+        packages.forEach { appendLine("DISABLE=$it|Confirmed standalone optional test app") }
         append(AiReview.END)
     }
 
@@ -60,7 +58,7 @@ class AiReviewTest {
     @Test fun `shell injection or ADB commands are rejected`() {
         val preview = AiReview.parse(answer("com.example.demo; pm clear com.android.settings"), snapshot)
         assertFalse(preview.valid)
-        assertTrue(preview.problems.any { "Niepoprawna" in it })
+        assertTrue(preview.problems.any { "Niepoprawny" in it })
     }
 
     @Test fun `not-present and previously disabled packages are rejected`() {
@@ -79,9 +77,43 @@ class AiReviewTest {
     @Test fun `prompt includes complete inventory but not fingerprint or serial`() {
         val prompt = AiReview.prompt(snapshot)
         assertTrue("MODEL=AQUOS_TVE19A" in prompt)
+        assertTrue("DEVICE=${snapshot.facts.device}" in prompt)
+        assertTrue("BUILD_SHA256=" in prompt)
+        assertTrue("DISABLE=com.przyklad." in prompt)
         assertTrue("S ON ${safe.value}" in prompt)
         assertTrue("S OFF ${alreadyOff.value}" in prompt)
         assertFalse(snapshot.facts.fingerprint in prompt)
         assertFalse(snapshot.facts.serialLast4 in prompt)
     }
+    @Test fun `no safe candidates is an accepted conservative result`() {
+        val answer = AiReview.example(snapshot).lines().take(6).joinToString("\n") +
+            "\nNONE=YES\n" + AiReview.END
+        val preview = AiReview.parse(answer, snapshot)
+        assertTrue(preview.valid)
+        assertTrue(preview.noCandidates)
+        assertTrue(preview.packages.isEmpty())
+    }
+
+    @Test fun `firmware and device mismatch are rejected`() {
+        val answer = answer(safe.value)
+        assertFalse(AiReview.parse(answer.replace("DEVICE=", "DEVICE=WRONG"), snapshot).valid)
+        assertFalse(AiReview.parse(answer.replace("BUILD_SHA256=", "BUILD_SHA256=WRONG"), snapshot).valid)
+    }
+
+    @Test fun `reason and keep entries are retained for human review`() {
+        val answer = answer(safe.value).replace(AiReview.END,
+            "KEEP=com.android.settings|System settings must remain enabled\n" + AiReview.END)
+        val preview = AiReview.parse(answer, snapshot)
+        assertTrue(preview.valid)
+        assertTrue(preview.why[safe]?.contains("standalone") == true)
+        assertTrue(preview.keep[settings]?.contains("System settings") == true)
+    }
+
+    @Test fun `contradictory and unreasoned suggestions are rejected as a whole`() {
+        val contradiction = answer(safe.value).replace(AiReview.END,
+            "KEEP=${safe.value}|This should remain enabled\n" + AiReview.END)
+        assertFalse(AiReview.parse(contradiction, snapshot).valid)
+        assertFalse(AiReview.parse(answer(safe.value).replace("|Confirmed standalone optional test app", "|"), snapshot).valid)
+    }
+
 }

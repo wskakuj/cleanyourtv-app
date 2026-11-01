@@ -3,10 +3,15 @@ package tv.cleanyour.core.flows
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import tv.cleanyour.core.model.Profile
+import tv.cleanyour.core.engine.RunStatus
+import tv.cleanyour.core.model.Op
+import tv.cleanyour.core.model.PackageName
+import tv.cleanyour.core.planner.PlanRequest
+import tv.cleanyour.core.planner.PlanResult
+import tv.cleanyour.core.spec.resolveFor
 import tv.cleanyour.core.model.Snapshot
 import tv.cleanyour.core.model.TvId
 import tv.cleanyour.core.spec.ProfileResolution
-import tv.cleanyour.core.spec.TvToolkitProfiles
 
 // 0.3.2 B1 and B2: the report preview. "Help add this TV" (TV) is the TV report for a TV with no exact
 // profile; "Report a problem" (PROBLEM) is the redacted diagnostics log with a short TV summary. Both
@@ -47,6 +52,10 @@ data class ReportState(
     val aiPrompt: String = "",
     val aiPreview: AiReview.Preview? = null,
     val toolkitProfileName: String? = null,
+    val aiExample: String = "",
+    val aiApplying: Boolean = false,
+    val aiOutcome: String? = null,
+    val aiApplied: Boolean = false,
 )
 
 sealed interface ReportIntent {
@@ -57,6 +66,7 @@ sealed interface ReportIntent {
     data object OpenIssue : ReportIntent
     data object CopyAiPrompt : ReportIntent
     data class PreviewAi(val text: String) : ReportIntent
+    data class ApplyAi(val selected: Set<PackageName>) : ReportIntent
     data class CopyToolkitPreferences(val preferences: ToolkitPreferences) : ReportIntent
 }
 
@@ -68,20 +78,24 @@ class ReportMachine(
 ) : Machine<ReportState, ReportIntent, ManageEffect>(ReportState(kind), scope) {
 
     private data class Loaded(val text: String, val url: String, val available: Boolean, val inLink: Boolean = false, val share: String = "", val shortened: Boolean = false,
-                              val sent: SentReport? = null, val aiPrompt: String = "", val toolkitProfileName: String? = null)
+                              val sent: SentReport? = null, val aiPrompt: String = "", val aiExample: String = "", val toolkitProfileName: String? = null)
     private data class Sent(val r: SentReport?, val error: Boolean = false)
     private data class AiPreviewed(val preview: AiReview.Preview)
+    private data class AiApplyUpdate(val busy: Boolean, val status: String?, val succeeded: Boolean = false)
 
     private var aiSnapshot: Snapshot? = null
     private var aiProfile: Profile? = null
+    private var reviewedText: String? = null
+    private var aiRunActive: Boolean = false
 
     init { scope.launch { send(build(kind)) } }
 
     override fun reduce(state: ReportState, event: Any): ReportState = when (event) {
         is Loaded -> state.copy(loading = false, text = event.text, url = event.url, available = event.available, inLink = event.inLink, shareText = event.share,
-            shortened = event.shortened, sent = event.sent, aiPrompt = event.aiPrompt, toolkitProfileName = event.toolkitProfileName)
+            shortened = event.shortened, sent = event.sent, aiPrompt = event.aiPrompt, aiExample = event.aiExample, toolkitProfileName = event.toolkitProfileName)
         is Sent -> state.copy(sent = event.r ?: state.sent, issueError = event.error)
-        is AiPreviewed -> state.copy(aiPreview = event.preview)
+        is AiPreviewed -> state.copy(aiPreview = event.preview, aiOutcome = null, aiApplied = false)
+        is AiApplyUpdate -> state.copy(aiApplying = event.busy, aiOutcome = event.status, aiApplied = event.succeeded)
         else -> state
     }
 
@@ -98,14 +112,57 @@ class ReportMachine(
             is ReportIntent.CopyToolkitPreferences -> if (after.kind == ReportKind.TV) {
                 aiSnapshot?.facts?.let { effect(ManageEffect.Copy(event.preferences.export(it))) }
             }
-            is ReportIntent.PreviewAi -> if (after.kind == ReportKind.TV) {
+            is ReportIntent.PreviewAi -> if (after.kind == ReportKind.TV && !after.aiApplying) {
+                reviewedText = event.text
                 val snap = aiSnapshot
                 if (snap != null) scope.launch { send(AiPreviewed(AiReview.parse(event.text, snap, aiProfile))) }
+            }
+            is ReportIntent.ApplyAi -> if (after.kind == ReportKind.TV && !after.aiApplying && !aiRunActive && after.aiPreview?.valid == true && event.selected.isNotEmpty()) {
+                aiRunActive = true
+                scope.launch { try { applyAi(event.selected) } finally { aiRunActive = false } }
             }
             else -> {}
         }
     }
 
+    /** Explicitly opted-in AI suggestions: fresh live read, exact reparse, pre-write restore point, guarded ADB plan. */
+    private suspend fun applyAi(selected: Set<PackageName>) {
+        send(AiApplyUpdate(true, null))
+        val result = attempt {
+            val id = tvId ?: return@attempt "Nie wybrano telewizora."
+            val tv = d.tv(id) ?: return@attempt "Nie znaleziono zapisanego telewizora."
+            val text = reviewedText ?: return@attempt "Najpierw zweryfikuj odpowiedz AI."
+            val session = (d.access.session(id) as? AccessResult.Ok)?.session
+                ?: return@attempt "Telewizor jest offline. Polacz ponownie i sprawdz liste."
+            val fresh = d.runner.freshSnapshot(session)
+            val profile = (d.profiles.resolveFor(fresh.facts, fresh.home, fresh.packages) as? ProfileResolution.Exact)?.profile
+            val checked = AiReview.parse(text, fresh, profile)
+            if (!checked.valid || selected.any { it !in checked.packages })
+                return@attempt "Lista lub stan TV zmienily sie. Przeprowadz analize AI ponownie."
+            val baseline = d.snapshots.baseline(id)
+            val refusal = RecoveryGate.refusal(baseline, fresh, selected.map { Op.Disable(it) })
+            if (refusal != null) return@attempt refusal
+            val dryPlan = (d.runner.plan(tv, PlanRequest.SwitchOff(selected), fresh) as? PlanResult.Ok)?.plan
+                ?: return@attempt "Zabezpieczenia odmowily utworzenia planu. Nic nie zmieniono."
+            if (dryPlan.steps.size != selected.size || dryPlan.steps.any { it.op !is Op.Disable } ||
+                dryPlan.steps.map { (it.op as Op.Disable).pkg }.toSet() != selected)
+                return@attempt "Plan zawiera inne operacje niz zatwierdzone pakiety. Przerwano."
+            d.sessionEnd.touched(id)
+            if (!d.restorePoint.writeVerified(tv, session, profile))
+                return@attempt "Nie udalo sie zapisac punktu przywracania na TV. Niczego nie wylaczono."
+            when (val write = TvWriter(d).write(id, PlanRequest.SwitchOff(selected), fresh = true)) {
+                is WriteResult.Done -> if (write.finished.status == RunStatus.COMPLETED && write.finished.skipped.isEmpty())
+                    return@attempt "OK: wylaczono ${selected.size} wybranych pakietow. Mozesz je przywrocic w Switched off."
+                    else return@attempt "Czesc operacji zostala pominieta. Sprawdz status TV i liste wylaczonych."
+                WriteResult.GateCancelled -> return@attempt "Anulowano. Niczego nie zmieniono."
+                WriteResult.NoTv -> return@attempt "Utracono polaczenie z TV. Sprawdz stan przed ponowieniem."
+                is WriteResult.Paused -> return@attempt "Plan wstrzymany. Wroc do aplikacji i uzyj mechanizmu przywracania."
+                is WriteResult.Refused -> return@attempt "Zabezpieczenia odrzucily plan: ${write.reasons.joinToString("; ").take(280)}"
+                else -> return@attempt "Nie potwierdzono wykonania planu. Odswiez stan telewizora."
+            }
+        }.getOrElse { "Nie mozna bezpiecznie ukonczyc zmian. Sprawdz polaczenie i stan TV." }
+        send(AiApplyUpdate(false, result, result.startsWith("OK:")))
+    }
     // 0.4.7: a TV report that left the phone (copied and opened, or shared) is remembered for the
     // TV, with today's date; the issue link it went to is kept once the person pastes it. Sending
     // again keeps the link and moves the date.
@@ -147,12 +204,8 @@ class ReportMachine(
                 aiSnapshot = input.snapshot
                 aiProfile = (input.profile as? ProfileResolution.Exact)?.profile
                 Loaded(compact, link.url, true, link.reportInLink, share = TvReport.text(input), sent = tvId?.let { id -> attempt { d.sentReports.load(id) }.getOrNull() },
-                    aiPrompt = AiReview.prompt(input.snapshot),
-                    toolkitProfileName = when (aiProfile?.id) {
-                        TvToolkitProfiles.SHARP_ID -> "Sharp AQUOS_TVE19A"
-                        TvToolkitProfiles.PHILIPS_ID -> "Philips TPM191E"
-                        else -> null
-                    })
+                    aiPrompt = AiReview.prompt(input.snapshot), aiExample = AiReview.example(input.snapshot),
+                    toolkitProfileName = aiProfile?.id)
             }
         }
         // 0.4.8: the confirmation block (TvReport.confirmation) in the confirmation form; none before a restart counted.

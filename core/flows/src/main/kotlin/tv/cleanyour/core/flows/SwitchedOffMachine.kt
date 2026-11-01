@@ -2,6 +2,7 @@ package tv.cleanyour.core.flows
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import tv.cleanyour.core.model.EnabledState
 import tv.cleanyour.core.model.GroupDefault
 import tv.cleanyour.core.model.Level
 import tv.cleanyour.core.model.Op
@@ -36,10 +37,15 @@ data class SwitchedOffState(
     val busy: PackageName? = null,
     val loading: Boolean = true,
     val count: Int = 0,
+    val oursCount: Int = 0,
+    val external: List<OffRow> = emptyList(),
+    val fresh: Boolean = false,
+    val toolkitMode: Boolean = false,
 )
 
 sealed interface SwitchedOffIntent {
     data class PutBack(val pkg: PackageName) : SwitchedOffIntent
+    data class ConfirmExternalPutBack(val pkg: PackageName) : SwitchedOffIntent
     data class Undo(val pkg: PackageName) : SwitchedOffIntent           // the snackbar's Undo: switch it off again
     data class SetOff(val pkg: PackageName, val off: Boolean) : SwitchedOffIntent   // Custom: the ask groups' pills
     data object Refresh : SwitchedOffIntent
@@ -58,11 +64,12 @@ class SwitchedOffMachine(
     // The "Better back on" rows (WP4, G4): their put back offers no Undo, which would switch off
     // again what the list for this TV now keeps on.
     private var advised: Set<PackageName> = emptySet()
+    private var externalDisabled: Set<PackageName> = emptySet()
 
     // An updater this build keeps on: no Off pill, no Undo after Put back.
     private fun keptOn(pkg: PackageName): Boolean = !d.store.updatesOff && ProfileCategory.isUpdater(pkg, profileGroups)
 
-    init { scope.launch { load() } }
+    init { scope.launch { load(refresh = true) } }
 
     override fun reduce(state: SwitchedOffState, event: Any): SwitchedOffState = when (event) {
         is Loaded -> event.s.copy(busy = state.busy)
@@ -73,11 +80,12 @@ class SwitchedOffMachine(
     override fun handle(event: Any, before: SwitchedOffState, after: SwitchedOffState) {
         if (after.busy != null && event is SwitchedOffIntent && event !is SwitchedOffIntent.Refresh) return
         when (event) {
-            is SwitchedOffIntent.PutBack -> change(event.pkg, PlanRequest.PutBack(event.pkg), SnackKind.PUT_BACK, undo = !keptOn(event.pkg) && event.pkg !in advised)
-            is SwitchedOffIntent.Undo -> if (!keptOn(event.pkg)) change(event.pkg, PlanRequest.SwitchOff(setOf(event.pkg)), SnackKind.SWITCHED_OFF, undo = false)
+            is SwitchedOffIntent.PutBack -> if (event.pkg !in externalDisabled) change(event.pkg, PlanRequest.PutBack(event.pkg), SnackKind.PUT_BACK, undo = !keptOn(event.pkg) && event.pkg !in advised)
+            is SwitchedOffIntent.ConfirmExternalPutBack -> if (event.pkg in externalDisabled) change(event.pkg, PlanRequest.PutBack(event.pkg), SnackKind.PUT_BACK, undo = false)
+            is SwitchedOffIntent.Undo -> if (!keptOn(event.pkg) && event.pkg !in externalDisabled) change(event.pkg, PlanRequest.SwitchOff(setOf(event.pkg)), SnackKind.SWITCHED_OFF, undo = false)
             is SwitchedOffIntent.SetOff -> if (event.off) { if (!keptOn(event.pkg)) change(event.pkg, PlanRequest.SwitchOff(setOf(event.pkg)), SnackKind.SWITCHED_OFF, undo = false) }
                 else change(event.pkg, PlanRequest.PutBack(event.pkg), SnackKind.PUT_BACK, undo = false)
-            SwitchedOffIntent.Refresh -> scope.launch { load() }
+            SwitchedOffIntent.Refresh -> scope.launch { load(refresh = true) }
             else -> {}
         }
     }
@@ -87,7 +95,7 @@ class SwitchedOffMachine(
             send(BusyOn(pkg))
             val r = writer.write(tvId, request)
             send(BusyOn(null))
-            load()
+            load(refresh = true)
             when (r) {
                 // A switch-off the run skipped changed nothing, so there is nothing to undo:
                 // RF-LAUNCHER-250 F1, kept because it runs the TV's inputs; otherwise the TV kept it
@@ -104,32 +112,44 @@ class SwitchedOffMachine(
         }
     }
 
-    private suspend fun load() {
+    private suspend fun load(refresh: Boolean = false) {
         val tv = d.tv(tvId) ?: return
         val off = d.ledger.switchedOffByUs(tvId)
         val profile = d.profileOf(tv)
-        val latest = d.snapshots.latest(tvId)
+        // The full inventory is read from the TV when reachable, not inferred from our journal.
+        val session = if (refresh) (d.access.session(tvId) as? AccessResult.Ok)?.session else d.access.live(tvId)
+        val fresh = if (session != null) attempt { d.runner.freshSnapshot(session) }.getOrNull() else null
+        val latest = fresh ?: d.snapshots.latest(tvId)
         val labels = latest?.packages.orEmpty()
+        val disabled = labels.filterValues {
+            it.enabled == EnabledState.DISABLED || it.enabled == EnabledState.DISABLED_USER
+        }.keys
+        // A user may have re-enabled our package from a PC since the last run.
+        val ourCurrentOff = if (latest == null) off else off.filter { it in disabled }.toSet()
+        val external = disabled.filterNot { it in ourCurrentOff }.sortedBy { it.value }
+        externalDisabled = external.toSet()
         fun row(p: PackageName, isOff: Boolean) = OffRow(p, d.nameOf(p, labels[p]?.label), d.facts.lookup(p)?.description, isOff)
         val groups = profile?.groups.orEmpty()
         profileGroups = groups
         val placed = HashSet<PackageName>()
-        // Only what this list shows as switched off by us, and PutBackAdvice's own rule on top.
-        val advice = PutBackAdvice.offers(tv.profileId, latest, d.ledger.changes(tvId), profile).filter { it.pkg in off }
+        val advice = PutBackAdvice.offers(tv.profileId, latest, d.ledger.changes(tvId), profile).filter { it.pkg in ourCurrentOff }
         val better = advice.distinctBy { it.pkg }.map { e -> row(e.pkg, true).copy(reason = e.reason) }
         val atTop = better.map { it.pkg }.toSet()
         advised = atTop
         placed += atTop
         val byGroup = groups.mapNotNull { g ->
-            val rows = g.packages.map { it.name }.filter { it in off && it !in atTop }.map { placed += it; row(it, true) }
+            val rows = g.packages.map { it.name }.filter { it in ourCurrentOff && it !in atTop }.map { placed += it; row(it, true) }
             if (rows.isEmpty()) null else OffGroup(g.id, g.title, rows)
         }
-        val rest = off.filterNot { it in placed }.map { row(it, true) }
+        val rest = ourCurrentOff.filterNot { it in placed }.map { row(it, true) }
         val top = if (better.isEmpty()) null else OffGroup(OffGroup.BETTER_BACK_ON, OffGroup.BETTER_BACK_ON_TITLE, better)
         val all = listOfNotNull(top) + byGroup + listOfNotNull(if (rest.isEmpty()) null else OffGroup("other", "", rest))
         val ask = if (tv.level == Level.CUSTOM) groups.filter { it.default == GroupDefault.ASK }.map { g ->
-            OffGroup(g.id, g.title, g.packages.filter { labels.containsKey(it.name) && !keptOn(it.name) }.map { row(it.name, it.name in off) })
+            OffGroup(g.id, g.title, g.packages.filter { labels.containsKey(it.name) && !keptOn(it.name) && it.name !in externalDisabled }
+                .map { row(it.name, it.name in disabled) })
         }.filter { it.rows.isNotEmpty() } else emptyList()
-        send(Loaded(SwitchedOffState(tv.nickname, tv.level, all, ask, null, loading = false, count = off.size)))
+        send(Loaded(SwitchedOffState(tv.nickname, tv.level, all, ask, null, loading = false,
+            count = if (latest == null) off.size else disabled.size, oursCount = ourCurrentOff.size,
+            external = external.map { row(it, true) }, fresh = fresh != null, toolkitMode = true)))
     }
 }

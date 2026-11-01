@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="tvtoolkit_ai_title">Zapytaj AI o ten telewizor</string>
-    <string name="tvtoolkit_ai_intro">Skopiuj gotowy prompt zawierający model telewizora i wszystkie nazwy pakietów. Zapytaj AI, które zbędne pakiety można rozważyć do wyłączenia, a następnie wklej odpowiedź poniżej. Nic nie zostanie zmienione na telewizorze.</string>
+    <string name="tvtoolkit_ai_intro">Skopiuj prompt dopasowany do urządzenia, zawierający pakiety włączone i wyłączone. Wklej odpowiedź AI. Aplikacja sprawdzi nazwy pakietów, ale nie wykona żadnej komendy ADB pochodzącej od AI.</string>
     <string name="tvtoolkit_ai_privacy">Pełna lista zawiera również nazwy Twoich aplikacji. Sprawdź ją przed udostępnieniem AI. Nie zawiera numeru seryjnego, adresu IP ani klucza ADB.</string>
     <string name="tvtoolkit_ai_copy_prompt">Kopiuj listę pakietów i gotowy prompt</string>
-    <string name="tvtoolkit_ai_format">Odpowiedź musi mieć dokładnie taki format (przykładowy pakiet nie jest rekomendacją):</string>
+    <string name="tvtoolkit_ai_format">Odpowiedź musi mieć dokładnie taki format (pakiety w przykładzie są fikcyjne):</string>
     <string name="tvtoolkit_ai_paste">Wklej odpowiedź AI</string>
-    <string name="tvtoolkit_ai_only_preview">Na razie sprawdzamy propozycje. Ten ekran nie wykonuje żadnych zmian.</string>
+    <string name="tvtoolkit_ai_only_preview">Najpierw sprawdź odpowiedź i sam wybierz pakiety. Przed wykonaniem zmian ponownie odczytamy TV i zapiszemy punkt przywracania.</string>
     <string name="tvtoolkit_ai_check">Sprawdź proponowane pakiety</string>
-    <string name="tvtoolkit_ai_valid">Format i lista pakietów chronionych przeszły kontrolę. To tylko podgląd. Przed zmianami będzie potrzebna kopia, ponowna analiza TV i Twoja zgoda.</string>
+    <string name="tvtoolkit_ai_valid">Zgodność urządzenia, format i lista pakietów chronionych przeszły kontrolę. To nie dowód pełnego bezpieczeństwa. Wybierz tylko aplikacje, których nie potrzebujesz.</string>
     <string name="tvtoolkit_ai_invalid">Odpowiedź została odrzucona. Nic nie zmieniono. Sprawdź powody poniżej i poproś AI o poprawienie listy.</string>
     <string name="tvtoolkit_choices_title">Wybierz konfigurację TV Toolkit</string>
-    <string name="tvtoolkit_choices_intro">Naciśnij każdą pozycję, aby zmienić wybór. Potem skopiuj preferencje do dalszej konfiguracji.</string>
+    <string name="tvtoolkit_choices_intro">Dodatkowe preferencje. Instalacja launchera nie jest równoznaczna ze zmianą aktywnego Home.</string>
     <string name="tvtoolkit_launcher">Ekran główny</string>
     <string name="tvtoolkit_youtube">YouTube</string>
     <string name="tvtoolkit_media">Aplikacje multimedialne</string>
@@ -30,4 +30,26 @@
     <string name="tvtoolkit_choices_copy">Kopiuj mój wybór</string>
     <string name="tvtoolkit_matched_profile">Dopasowany profil TV Toolkit</string>
     <string name="tvtoolkit_profile_caution">Każdy pakiet jest opcjonalny; nie wyłączaj wszystkich automatycznie.</string>
+    <string name="tvtoolkit_ai_none">AI nie znalazło pewnych kandydatów. To prawidłowy, bezpieczny wynik.</string>
+    <string name="tvtoolkit_ai_choose">Wybierz tylko aplikacje, które naprawdę chcesz wyłączyć. Domyślnie żadna nie jest wybrana.</string>
+    <string name="tvtoolkit_ai_apply">Sprawdź i wyłącz wybrane</string>
+    <string name="tvtoolkit_ai_keep">Pakiety, które AI zaleca zachować (informacyjnie):</string>
+    <string name="tvtoolkit_ai_working">Sprawdzanie aktualnego stanu TV, zapis punktu przywracania i wykonywanie chronionego planu...</string>
+    <string name="tvtoolkit_ai_confirm_title">Potwierdź debloat</string>
+    <string name="tvtoolkit_ai_confirm_body">Aplikacja ponownie sprawdzi model, stan pakietów i punkt przywracania. Nie kontynuuj, jeżeli korzystasz z którejś z tych aplikacji.</string>
+    <string name="tvtoolkit_ai_confirm_button">Sprawdź i zastosuj</string>
+    <string name="tvtoolkit_report_technical">Raport techniczny i pomoc GitHub</string>
+    <string name="tvtoolkit_manage_ai">Analiza aplikacji z pomocą AI</string>
+    <string name="tvtoolkit_manage_ai_sub">Gotowy prompt, sprawdzenie odpowiedzi i wybór zmian</string>
+    <string name="tvtoolkit_manage_launcher">Aktualny launcher i dostępne opcje</string>
+    <string name="tvtoolkit_manage_active_home">Aktywny Home: %1$s</string>
+    <string name="tvtoolkit_manage_active_unknown">Nie udało się ustalić aktywnego Home. Bez automatycznej zmiany.</string>
+    <string name="tvtoolkit_external_title">Wyłączone poza tą aplikacją</string>
+    <string name="tvtoolkit_external_intro">Te pakiety są wyłączone, ale nie mamy zapisu, kto je wyłączył. Przywracaj świadomie.</string>
+    <string name="tvtoolkit_external_cached">To ostatni zapisany stan. Połącz się i odśwież listę przed przywróceniem.</string>
+    <string name="tvtoolkit_external_enable">Włącz</string>
+    <string name="tvtoolkit_external_confirm">Przywrócić pakiet wyłączony innym narzędziem?</string>
+    <string name="tvtoolkit_external_confirm_body">Inne narzędzie lub sam telewizor mógł wyłączyć ten pakiet celowo. Jego włączenie może zmienić konfigurację.</string>
+    <string name="tvtoolkit_inventory_refresh">Odśwież stan TV</string>
+    <string name="tvtoolkit_disabled_summary">Wyłączone przez tę aplikację: %1$d. Łącznie wyłączone na TV: %2$d.</string>
 </resources>

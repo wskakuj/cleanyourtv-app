@@ -236,6 +236,7 @@ fun FoundScreen(
     val kept = extras.homeKept as? HomeKept.Blocked ?: if (!summary.homeScreenPossible && extras.homePossible) HomeKept.Blocked(HomeBlock.NONE, extras.fireTv, extras.brand) else null
     // 0.4.7-beta2 (issue #251): with the Home button helper switched on there is something to do.
     val nothingToDo = kept != null && off == 0 && !extras.helperOn
+    val hasOptionalChoices = extras.toolkitMode && summary.groups.any { g -> g.rows.any { row -> !row.protected } }
     var why by rememberSaveable { mutableStateOf(false) }
     var chooseLauncher by rememberSaveable { mutableStateOf(false) }
     var confirmLauncherInstall by rememberSaveable { mutableStateOf(false) }
@@ -262,11 +263,11 @@ fun FoundScreen(
                     nothingToDo && extras.unknownModel -> {
                         PrimaryButton(stringResource(R.string.found_help_add_tv), onHelpAddTv, guardObscured = false)
                         SecondaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, enabled = extras.finishing == null && !toolkitInstalling)
-                        if (extras.helperOffer) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
+                        if (extras.helperOffer || hasOptionalChoices) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
                     }
                     nothingToDo -> {
                         PrimaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, enabled = extras.finishing == null && !toolkitInstalling, loading = extras.finishing == Finishing.SWITCHING, guardObscured = false)
-                        if (extras.helperOffer) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
+                        if (extras.helperOffer || hasOptionalChoices) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
                     }
                     else -> {
                         // Nothing to switch off and the switch is possible: the button says what it does.
@@ -281,8 +282,8 @@ fun FoundScreen(
         when {
             off > 0 -> NumeralHeadline(off, msg(if (extras.unknownModel) R.string.found_unknown_headline else R.string.found_headline, "count" to off), Modifier.padding(top = 6.dp))
             nothingToDo -> {
-                ScreenTitle(stringResource(R.string.found_title_zero_kept), Modifier.padding(top = 8.dp))
-                Body(stringResource(if (extras.unknownModel) R.string.found_zero_kept_unknown_body else R.string.found_zero_kept_body), Modifier.padding(start = 4.dp, top = 8.dp))
+                ScreenTitle(stringResource(if (hasOptionalChoices && extras.toolkitMode) R.string.tvtoolkit_found_no_selection else R.string.found_title_zero_kept), Modifier.padding(top = 8.dp))
+                Body(stringResource(if (hasOptionalChoices && extras.toolkitMode) R.string.tvtoolkit_found_choose_optional else if (extras.unknownModel) R.string.found_zero_kept_unknown_body else R.string.found_zero_kept_body), Modifier.padding(start = 4.dp, top = 8.dp))
             }
             else -> {
                 ScreenTitle(msg(if (extras.unknownModel) R.string.found_unknown_title else R.string.found_title, "count" to 0), Modifier.padding(top = 8.dp))

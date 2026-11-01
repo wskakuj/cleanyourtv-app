@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import tv.cleanyour.core.engine.RunState
 import tv.cleanyour.core.model.DebugState
+import tv.cleanyour.core.model.EnabledState
 import tv.cleanyour.core.model.Level
 import tv.cleanyour.core.model.TvId
 import tv.cleanyour.core.planner.HomeHelper
@@ -56,6 +57,7 @@ data class TvCard(
     // 0.4.8 (Restarts): what this phone counted across the TV's restarts, while the new home screen is on it; null
     // before the first read on a path (a TV never switched has none).
     val restarts: RestartTally? = null,
+    val activeHome: String? = null,
 )
 
 data class ManageState(
@@ -65,6 +67,7 @@ data class ManageState(
     val reconnecting: Boolean = false,
     val loading: Boolean = true,
     val addOns: Boolean = true,       // STORES-PLAN 1: the "Cards and modules" row (off in the Play build)
+    val toolkitMode: Boolean = false,     // Universal-toolkit actions; legacy previews keep their layout.
     val switchingHome: Boolean = false,   // 0.4.6: the wizard Home row's "Switch it back on" is running
 ) {
     val current: TvCard? get() = cards.firstOrNull { it.id == selected } ?: cards.firstOrNull()
@@ -82,6 +85,8 @@ sealed interface ManageIntent {
     data class Open(val section: ManageSection) : ManageIntent
     data object SetUpAnother : ManageIntent
     data object CleanAgain : ManageIntent
+    data object ReviewWithAi : ManageIntent
+    data object ChooseLauncher : ManageIntent
     data object AppSettings : ManageIntent
     data object HelpAddTv : ManageIntent
     data object SwitchStockHomeOn : ManageIntent   // 0.4.6: the wizard Home row (WizardHome)
@@ -98,13 +103,13 @@ class ManageMachine(
     private val d: ManageDeps,
     scope: CoroutineScope,
     initial: TvId? = null,
-) : Machine<ManageState, ManageIntent, ManageEffect>(ManageState(selected = initial, addOns = d.store.addOns), scope) {
+) : Machine<ManageState, ManageIntent, ManageEffect>(ManageState(selected = initial, addOns = d.store.addOns, toolkitMode = true), scope) {
 
     private data class Loaded(val cards: List<TvCard>)
     private data class Thumb(val tvId: TvId, val png: ByteArray?)
     private data class Reconnected(val ok: Boolean)
     private data object Reconnecting
-    private data class WizardHomeRead(val tvId: TvId, val applies: Boolean, val stockBack: Boolean = false)
+    private data class WizardHomeRead(val tvId: TvId, val applies: Boolean, val stockBack: Boolean = false, val activeHome: String? = null)
     private data class SwitchingHome(val on: Boolean)
     private data class RestartsRead(val tvId: TvId, val tally: RestartTally)
     // 0.4.6: what the last connect read of each TV's Home said (WizardHome), for the cards.
@@ -144,7 +149,8 @@ class ManageMachine(
                         id = tv.id, name = tv.nickname, room = tv.room, clean = off > 0, checkedAtMs = tv.lastSeenAt, level = tv.level,
                         chip = chipFor(states[tv.id]?.takeIf { d.access.live(tv.id) != null }, run, tv.debugging),
                         thumbnail = state.value.cards.firstOrNull { it.id == tv.id }?.thumbnail,
-                        switchedOff = off, dockNames = home?.let { shownDock(it) }.orEmpty().map { d.nameOf(it) },
+                        switchedOff = latest?.packages?.count { (_, state) -> state.enabled == EnabledState.DISABLED || state.enabled == EnabledState.DISABLED_USER } ?: off,
+                        dockNames = home?.let { shownDock(it) }.orEmpty().map { d.nameOf(it) },
                         restorePointAtMs = (d.snapshots.baseline(tv.id) ?: latest)?.takenAtMs, debugging = tv.debugging,
                         helpAddTv = tv.profileId == null && latest != null,
                         ownHome = tv.launcher == null && latest != null && Launcher.pkg !in latest.packages,
@@ -156,6 +162,7 @@ class ManageMachine(
                         stockHomeBack = d.stockHomeBacks[tv.id],
                         homeHelperOn = d.homeHelper && latest != null && HomeHelper.state(latest) == HomeHelper.State.ON,
                         restarts = attempt { d.restarts.load(tv.id) }.getOrNull()?.takeIf { it.path != null },
+                        activeHome = latest?.home?.resolved?.pkg?.value,
                     )
                 }
                 send(Loaded(cards))
@@ -230,7 +237,7 @@ class ManageMachine(
         wizardHomes[id] = applies
         if (d.stockHomeBacks.record(id, back)) d.log.line("manage: the TV's own home screen is on again after this app switched it off, " +
             if (home.resolved?.pkg == stock?.pkg) "and Home answers to it" else "Home answers to ${if (home.resolved?.pkg == Launcher.pkg) "ours" else "another"}")
-        send(WizardHomeRead(id, applies, back))
+        send(WizardHomeRead(id, applies, back, home.resolved?.pkg?.value))
     }
 
     // 0.4.8 (Restarts): on a TV whose home screen this app switched (or whose helper it switched on), the boot_id
@@ -282,7 +289,7 @@ class ManageMachine(
         is ManageIntent.Select -> state.copy(selected = event.tvId)
         is Thumb -> state.copy(cards = state.cards.map { if (it.id == event.tvId && event.png != null) it.copy(thumbnail = event.png) else it })
         Reconnecting -> state.copy(reconnecting = true)
-        is WizardHomeRead -> state.copy(cards = state.cards.map { if (it.id == event.tvId) it.copy(wizardHome = event.applies, stockHomeBack = event.stockBack) else it })
+        is WizardHomeRead -> state.copy(cards = state.cards.map { if (it.id == event.tvId) it.copy(wizardHome = event.applies, stockHomeBack = event.stockBack, activeHome = event.activeHome ?: it.activeHome) else it })
         is SwitchingHome -> state.copy(switchingHome = event.on)
         is RestartsRead -> state.copy(cards = state.cards.map { if (it.id == event.tvId) it.copy(restarts = event.tally) else it })
         is Reconnected -> state.copy(reconnecting = false, offline = !event.ok && state.offline)
@@ -306,7 +313,8 @@ class ManageMachine(
             ManageIntent.SwitchStockHomeOn -> if (id != null && !before.switchingHome && after.current?.wizardHome == true) scope.launch { switchStockHomeOn(id) }
             is ManageIntent.Open -> if (event.section != ManageSection.MODULES || d.store.addOns) id?.let { effect(ManageEffect.Navigate("${event.section.key}/${it.value}")) }
             ManageIntent.SetUpAnother -> effect(ManageEffect.Navigate("setup"))
-            ManageIntent.CleanAgain -> id?.let { effect(ManageEffect.Navigate("setup/${it.value}")) }
+            ManageIntent.CleanAgain, ManageIntent.ChooseLauncher -> id?.let { effect(ManageEffect.Navigate("setup/${it.value}")) }
+            ManageIntent.ReviewWithAi -> id?.let { effect(ManageEffect.Navigate("report/tv/${it.value}")) }
             ManageIntent.AppSettings -> effect(ManageEffect.Navigate("appsettings"))
             ManageIntent.HelpAddTv -> id?.let { effect(ManageEffect.Navigate("report/tv/${it.value}")) }
             // Only once a restart held (or failed): the preview shows the block, and only its Open GitHub sends anything.
