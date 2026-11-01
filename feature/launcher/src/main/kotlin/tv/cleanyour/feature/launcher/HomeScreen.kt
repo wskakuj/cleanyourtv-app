@@ -218,6 +218,7 @@ internal fun NotOnTvScreen(
             HomeBlock.TV_REFUSES -> msg(R.string.home_not_on_tv_refuses, "brand" to (if (n.fireTv) stringResource(R.string.home_fire_tv_name) else n.brand))
             HomeBlock.OLD_ANDROID -> stringResource(R.string.home_not_on_tv_old_android)
             HomeBlock.UNKNOWN_HOME -> stringResource(R.string.home_not_on_tv_unknown_home)
+            HomeBlock.OPERATOR_HOME -> stringResource(R.string.home_not_on_tv_operator_home)
             HomeBlock.WIZARD_WIFI -> stringResource(if (n.unlisted) R.string.home_not_on_tv_wizard_wifi_unlisted else R.string.home_not_on_tv_wizard_wifi)
             HomeBlock.WIZARD_WIFI_UNKNOWN -> stringResource(R.string.home_not_on_tv_wizard_wifi_unknown)
             HomeBlock.CASTING -> stringResource(R.string.home_not_on_tv_casting)
@@ -234,6 +235,7 @@ internal fun NotOnTvScreen(
         val next = when {
             n.helpAddTv -> R.string.home_not_on_tv_next_list
             !n.setupAgain -> null
+            n.reason == HomeBlock.OPERATOR_HOME -> null // Operator Home must not be offered for takeover on retry.
             n.earlier -> R.string.home_not_on_tv_next_check
             n.reason == HomeBlock.WIZARD_WIFI -> R.string.home_not_on_tv_next_wifi
             n.reason == HomeBlock.WIZARD_WIFI_UNKNOWN -> R.string.home_not_on_tv_next_check

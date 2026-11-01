@@ -30,6 +30,7 @@ import tv.cleanyour.core.spec.ProfileResolution
 import tv.cleanyour.core.spec.TvToolkitProfiles
 import tv.cleanyour.core.store.SnapshotCodec
 import tv.cleanyour.testing.fixtures.Issue036
+import tv.cleanyour.testing.fixtures.Samples
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -41,14 +42,14 @@ import kotlin.test.assertTrue
 // is planned as usual.
 class HomeSwitchRiskTest {
     @Test fun canalOperatorHomeIsAlwaysKeptEvenWithAnExactProfile() {
-        val facts = tv.cleanyour.testing.fixtures.Samples.miTvFacts().copy(
+        val facts = Samples.miTvFacts().copy(
             brand = "CANAL-PLUS", manufacturer = "SkyworthDigital", model = "CANAL PLUS BOX",
             device = "HY40A2", sdk = 29,
             fingerprint = "CANAL-PLUS/HY4001/HY40A2:10/QTT8.201201.002/C3.0.8_20220628:user/release-keys")
         val stock = Component(PackageName("com.canal.box"), ".ui.boot.BoxMainActivity")
         val fallback = Component(PackageName("com.android.tv.settings"), ".system.FallbackHome")
         val home = HomeResolution(stock, listOf(HomeClaimant(stock, 2), HomeClaimant(fallback, -1000)))
-        val tv = tv.cleanyour.testing.fixtures.Samples.miTvSnapshot().copy(facts = facts, home = home)
+        val tv = Samples.miTvSnapshot().copy(facts = facts, home = home)
         for (wifi in WizardWifi.entries) {
             assertEquals(Risk.OPERATOR_HOME, HomeSwitchRisk.of(facts, TvToolkitProfiles.canal, tv, wifi, anyBrand = true))
         }
