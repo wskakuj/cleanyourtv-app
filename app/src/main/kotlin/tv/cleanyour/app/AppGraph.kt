@@ -123,7 +123,8 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
     ))
     // Test build: the person's answers on Setup's candidate list card, which every resolve reads.
     val candidateChoices = tv.cleanyour.core.flows.CandidateChoices(documents)
-    val profiles = TvToolkitProfileSource(BundledProfileSource(consent = candidateChoices))
+    val bundledProfiles = BundledProfileSource(consent = candidateChoices)
+    val profiles = TvToolkitProfileSource(bundledProfiles)
     val facts = BundledFactsTable()
 
     // W3: renderer variant A (the nohup setsid watchdog) until S12 says otherwise.
@@ -206,7 +207,7 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         curtainPin = curtainPin,   // RFC-CURTAIN-1
         store = store.rules,       // STORES-PLAN 1
         homeDecisions = homeDecisions,   // 0.3.2 B1
-        candidates = tv.cleanyour.core.flows.BundledCandidateLists(profiles, candidateChoices),   // test build
+        candidates = tv.cleanyour.core.flows.BundledCandidateLists(bundledProfiles, candidateChoices),   // test build
         about = about, connectDetail = { sessions.lastConnectFailure },   // 0.3.6: "Copy error"
         documents = documents,     // 0.4.0: the person's photo for the look step (OwnPicture)
         wrongFocus = { tvId -> wrongFocus.remove(tvId) },                 // issue #629
