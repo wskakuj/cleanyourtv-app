@@ -66,6 +66,7 @@ import tv.cleanyour.core.flows.SetupState
 import tv.cleanyour.core.flows.Sheet
 import tv.cleanyour.core.flows.StopAction
 import tv.cleanyour.core.flows.StopCase
+import tv.cleanyour.core.flows.ToolkitInstallStage
 import tv.cleanyour.core.flows.ToolkitLauncher
 import tv.cleanyour.core.model.Level
 import tv.cleanyour.core.model.PackageName
@@ -237,6 +238,8 @@ fun FoundScreen(
     val nothingToDo = kept != null && off == 0 && !extras.helperOn
     var why by rememberSaveable { mutableStateOf(false) }
     var chooseLauncher by rememberSaveable { mutableStateOf(false) }
+    var confirmLauncherInstall by rememberSaveable { mutableStateOf(false) }
+    val toolkitInstalling = extras.toolkitInstallStage in setOf(ToolkitInstallStage.DOWNLOADING, ToolkitInstallStage.CHECKING, ToolkitInstallStage.BACKUP, ToolkitInstallStage.INSTALLING)
     val locale = LocalConfiguration.current.locales[0]
     ScreenScaffold(
         Glow.Tv, modifier,
@@ -258,16 +261,16 @@ fun FoundScreen(
                     // helper is offered, or a TV cleaned before (Run Setup again) could never reach it (#251).
                     nothingToDo && extras.unknownModel -> {
                         PrimaryButton(stringResource(R.string.found_help_add_tv), onHelpAddTv, guardObscured = false)
-                        SecondaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, enabled = extras.finishing == null)
+                        SecondaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, enabled = extras.finishing == null && !toolkitInstalling)
                         if (extras.helperOffer) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
                     }
                     nothingToDo -> {
-                        PrimaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, enabled = extras.finishing == null, loading = extras.finishing == Finishing.SWITCHING, guardObscured = false)
+                        PrimaryButton(stringResource(R.string.action_done), { actions.intent(SetupIntent.LeaveAsIs) }, enabled = extras.finishing == null && !toolkitInstalling, loading = extras.finishing == Finishing.SWITCHING, guardObscured = false)
                         if (extras.helperOffer) TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
                     }
                     else -> {
                         // Nothing to switch off and the switch is possible: the button says what it does.
-                        PrimaryButton(stringResource(if (off == 0) R.string.found_switch_home else R.string.found_make_clean), { actions.intent(SetupIntent.MakeItClean) }, loading = extras.starting)
+                        PrimaryButton(stringResource(if (off == 0) R.string.found_switch_home else R.string.found_make_clean), { actions.intent(SetupIntent.MakeItClean) }, enabled = !toolkitInstalling, loading = extras.starting)
                         TertiaryButton(stringResource(R.string.found_customise), { actions.intent(SetupIntent.Open(Sheet.CUSTOMISE)) })
                     }
                 }
@@ -296,7 +299,30 @@ fun FoundScreen(
                 ToolkitLauncher.PROJECTIVY -> stringResource(R.string.toolkit_launcher_projectivy)
             }
             TextActionRow(stringResource(R.string.toolkit_launcher_row, launcherName), stringResource(R.string.found_home_change),
-                { chooseLauncher = true }, Modifier.padding(top = 12.dp))
+                { if (!toolkitInstalling) chooseLauncher = true }, Modifier.padding(top = 12.dp))
+        }
+        if (extras.toolkitMode && extras.toolkitLauncher != ToolkitLauncher.KEEP_STOCK) {
+            val selected = when (extras.toolkitLauncher) {
+                ToolkitLauncher.FLAUNCHER -> stringResource(R.string.toolkit_launcher_flauncher)
+                ToolkitLauncher.PROJECTIVY -> stringResource(R.string.toolkit_launcher_projectivy)
+                else -> stringResource(R.string.toolkit_launcher_keep)
+            }
+            Body(stringResource(R.string.toolkit_install_keeps_home), Modifier.padding(start = 4.dp, top = 8.dp))
+            when (extras.toolkitInstallStage) {
+                ToolkitInstallStage.IDLE, ToolkitInstallStage.FAILED ->
+                    SecondaryButton(stringResource(R.string.toolkit_install_button, selected), { confirmLauncherInstall = true },
+                        Modifier.padding(top = 12.dp), enabled = !toolkitInstalling)
+                ToolkitInstallStage.INSTALLED ->
+                    Banner(stringResource(R.string.toolkit_install_installed), BannerTone.SUCCESS, Modifier.padding(top = 12.dp))
+                else -> Banner(
+                    when (extras.toolkitInstallStage) {
+                        ToolkitInstallStage.DOWNLOADING -> stringResource(R.string.toolkit_install_downloading, extras.toolkitInstallPercent)
+                        ToolkitInstallStage.CHECKING -> stringResource(R.string.toolkit_install_checking)
+                        ToolkitInstallStage.BACKUP -> stringResource(R.string.toolkit_install_backup)
+                        else -> stringResource(R.string.toolkit_install_installing)
+                    }, BannerTone.INFO, Modifier.padding(top = 12.dp))
+            }
+            extras.toolkitInstallError?.let { Banner(it, BannerTone.WARNING, Modifier.padding(top = 12.dp)) }
         }
         if (extras.finishing == Finishing.SWITCHING) Banner(stringResource(R.string.done_finishing), BannerTone.INFO, Modifier.padding(top = 12.dp))
         if (extras.finishFailed) Banner(stringResource(R.string.toolkit_finish_failed), BannerTone.WARNING, Modifier.padding(top = 12.dp))
@@ -352,6 +378,17 @@ fun FoundScreen(
         else -> {}
     }
     if (why && kept != null) CytBottomSheet({ why = false }) { WhyKeptContent(kept, onOpenUrl, onHelpAddTv = if (kept.unlisted && HomeKept.needsList(kept.block, true)) onHelpAddTv else null) }
+    if (confirmLauncherInstall) CytBottomSheet({ confirmLauncherInstall = false }) {
+        SheetHeader(stringResource(R.string.toolkit_install_confirm_title), subtitle = stringResource(R.string.toolkit_install_confirm_note))
+        Banner(stringResource(R.string.toolkit_install_confirm_warning), BannerTone.INFO, Modifier.padding(top = 12.dp))
+        ActionColumn(Modifier.padding(top = 16.dp)) {
+            PrimaryButton(stringResource(R.string.toolkit_install_confirm_button), {
+                confirmLauncherInstall = false
+                actions.intent(SetupIntent.InstallToolkitLauncher)
+            }, guardObscured = true)
+            SecondaryButton(stringResource(R.string.toolkit_install_cancel), { confirmLauncherInstall = false })
+        }
+    }
     if (chooseLauncher) CytBottomSheet({ chooseLauncher = false }) {
         SheetHeader(stringResource(R.string.toolkit_launcher_title), subtitle = stringResource(R.string.toolkit_launcher_preview_note))
         ChoiceList(

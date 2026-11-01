@@ -85,6 +85,7 @@ sealed interface SetupIntent { data object Start : SetupIntent; data class PickT
     // 0.4.7 (UX finding 5, PM 7): "Done" on What we found when there is nothing to switch off and the
     // TV keeps its own home screen: Setup ends without a run.
     data class ChooseToolkitLauncher(val launcher: ToolkitLauncher) : SetupIntent
+    data object InstallToolkitLauncher : SetupIntent
     data object LeaveAsIs : SetupIntent }
 // RFC-W8-1: a stop card button by position; the machine maps it per StopCase
 enum class StopAction { PRIMARY, SECONDARY, TERTIARY }

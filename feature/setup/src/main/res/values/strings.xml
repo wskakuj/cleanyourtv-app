@@ -81,7 +81,19 @@
     <string name="toolkit_launcher_keep_note">Leave the TV menu as it is</string>
     <string name="toolkit_launcher_flauncher" translatable="false">FLauncher</string>
     <string name="toolkit_launcher_projectivy" translatable="false">Projectivy Launcher</string>
-    <string name="toolkit_launcher_preview_note">This saves your preference on the phone. Installing or switching an external launcher is not available yet; your TV menu will not be changed by this choice.</string>
+    <string name="toolkit_launcher_preview_note">Choose a launcher. Choosing alone does not change the TV. You can install its official APK separately.</string>
+    <string name="toolkit_install_keeps_home">The TV keeps its current Home screen. Installation never disables the factory launcher.</string>
+    <string name="toolkit_install_button">Install %1$s on TV</string>
+    <string name="toolkit_install_installed">Launcher is installed. The TV keeps its current Home screen.</string>
+    <string name="toolkit_install_downloading">Downloading verified APK… %1$d%%</string>
+    <string name="toolkit_install_checking">Checking package, hash and signing certificate…</string>
+    <string name="toolkit_install_backup">Saving a restore point on the TV before installation…</string>
+    <string name="toolkit_install_installing">Installing the APK on TV and checking the result…</string>
+    <string name="toolkit_install_confirm_title">Install selected launcher?</string>
+    <string name="toolkit_install_confirm_note">This installs the APK only. It will not switch Home or disable the TV launcher.</string>
+    <string name="toolkit_install_confirm_warning">Only the publisher-pinned file and signing key are accepted. A restore point and phone confirmation are required. Keep the TV connected.</string>
+    <string name="toolkit_install_confirm_button">Install APK only</string>
+    <string name="toolkit_install_cancel">Cancel</string>
     <string name="toolkit_finish_failed">Couldn\'t confirm that debugging was switched off. Check the TV\'s developer settings and tap Done to retry. For safety we haven\'t finished setup.</string>
     <!-- An empty dock: the row names the new home screen (UX 2 dock card title) instead of a blank list -->
     <string name="found_home_row_empty">Your new home screen</string>

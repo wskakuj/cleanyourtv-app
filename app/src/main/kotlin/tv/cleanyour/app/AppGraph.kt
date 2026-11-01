@@ -166,6 +166,14 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         InstallableOnlyFetcher(ResumableArtifactFetcher(http, blobs, blobs, inspector, urlAllowed = hostAllowed)) { registry.installableIndex() }
     }
 
+    // Toolkit-only: a separate, exact-host downloader for the two publisher-pinned APKs.
+    // Never widen the signed module registry's host trust list, or enable downloads in Play.
+    private val toolkitAllowed: (String) -> Boolean = { DownloadHosts.isAllowed(it, DownloadHosts.ALL + "gitlab.com") }
+    private val toolkitHttp = UrlConnectionFetcher(urlAllowed = toolkitAllowed)
+    val toolkitFetcher = if (store.rules.addOns) {
+        ResumableArtifactFetcher(toolkitHttp, blobs, blobs, inspector, urlAllowed = toolkitAllowed)
+    } else null
+
     val seams = Seams(
         sessions = sessions, keyInfo = keyInfo, prober = prober, profiles = profiles, facts = facts, themes = themes,
         planner = planner, engine = engine, journal = journal, configTransport = configTransport, snapshots = snapshots,
@@ -212,7 +220,9 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         documents = documents,     // 0.4.0: the person's photo for the look step (OwnPicture)
         wrongFocus = { tvId -> wrongFocus.remove(tvId) },                 // issue #629
         restarts = restarts,       // 0.4.8
-        toolkitMode = true,        // TV Toolkit fork: show the external-launcher preference picker
+        toolkitMode = store.rules.addOns, // Full build only; Play never installs an external APK.
+        toolkitFetcher = toolkitFetcher,
+        toolkitInspector = inspector,
     )
 
     val manageDeps = ManageDeps(
