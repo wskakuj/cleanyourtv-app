@@ -57,7 +57,7 @@
     <string name="manage_row_cards_own_home">Shown as apps: this TV keeps its own home screen</string>
     <string name="manage_row_cards_none">No cards yet</string>
     <string name="manage_row_switched_off">{count, plural, other {Switched off (#)}}</string>
-    <string name="manage_row_switched_off_sub">See all disabled packages, including changes made on a computer.</string>
+    <string name="manage_row_switched_off_sub">Put any of them back</string>
     <string name="manage_row_better_back_on">{count, plural, one {# app is better switched back on} other {# apps are better switched back on}}</string>
     <string name="manage_row_leftovers">Check for leftovers</string>
     <string name="manage_row_leftovers_sub">After a TV software update</string>

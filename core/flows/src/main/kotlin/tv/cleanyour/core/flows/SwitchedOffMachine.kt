@@ -37,6 +37,7 @@ data class SwitchedOffState(
     val busy: PackageName? = null,
     val loading: Boolean = true,
     val count: Int = 0,
+    val totalCount: Int = 0,
     val oursCount: Int = 0,
     val external: List<OffRow> = emptyList(),
     val fresh: Boolean = false,
@@ -149,7 +150,8 @@ class SwitchedOffMachine(
                 .map { row(it.name, it.name in disabled) })
         }.filter { it.rows.isNotEmpty() } else emptyList()
         send(Loaded(SwitchedOffState(tv.nickname, tv.level, all, ask, null, loading = false,
-            count = if (fresh == null) maxOf(off.size, disabled.size) else disabled.size, oursCount = ourCurrentOff.size,
+            count = off.size, totalCount = if (fresh == null) maxOf(off.size, disabled.size) else disabled.size,
+            oursCount = ourCurrentOff.size,
             external = external.map { row(it, true) }, fresh = fresh != null, toolkitMode = true)))
     }
 }

@@ -345,7 +345,7 @@ internal fun ColumnScope.OpenWriteContent(
 fun SwitchedOffScreen(state: SwitchedOffState, onIntent: (SwitchedOffIntent) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
     var pendingExternal by rememberSaveable { mutableStateOf<String?>(null) }
     ScreenScaffold(Glow.Tv, modifier, topBar = { CytTopBar(onBack = onBack) }) {
-        ScreenTitle(msg(R.string.switchedoff_title, "count" to state.count), titleTop)
+        ScreenTitle(msg(R.string.switchedoff_title, "count" to if (state.toolkitMode) state.totalCount else state.count), titleTop)
         if (state.loading) {
             Box(Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) { Spinner(size = 24.dp) }
             return@ScreenScaffold
@@ -374,7 +374,7 @@ fun SwitchedOffScreen(state: SwitchedOffState, onIntent: (SwitchedOffIntent) -> 
         }
         // Custom adds the ask groups with Off / Kept pills and the package names in grey (D2).
         if (state.toolkitMode) {
-            Body(stringResource(R.string.tvtoolkit_disabled_summary, state.oursCount, state.count),
+            Body(stringResource(R.string.tvtoolkit_disabled_summary, state.oursCount, state.totalCount),
                 Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
             if (!state.fresh) Banner(stringResource(R.string.tvtoolkit_external_cached),
                 BannerTone.INFO, Modifier.padding(top = 12.dp))
