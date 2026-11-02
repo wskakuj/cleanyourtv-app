@@ -140,6 +140,28 @@ class SetupMachineTest {
         assertIs<SetupState.Found>(m.state.value)
     }
 
+    @Test fun canalDebloatRefusesAnyDisableIfTheTvRestorePointCannotBeWritten() = runTest(timeout = 30.seconds) {
+        val h = Harness()
+        h.sessions.allowPromptFor[HOST] = "AB:CD:7F:2A"
+        h.profiles.resolver = { _, _ -> tv.cleanyour.core.spec.ProfileResolution.Exact(
+            tv.cleanyour.core.spec.TvToolkitProfiles.canal) }
+        h.planner.respond = { request, _ -> when (request) {
+            is PlanRequest.Setup -> PlanResult.Ok(h.setupPlan)
+            is PlanRequest.WriteRestorePoint -> PlanResult.Refused(listOf("TV storage unavailable"))
+            else -> PlanResult.Refused(listOf("unexpected request"))
+        } }
+        val m = h.setup(backgroundScope)
+        toFound(h, m)
+        assertEquals(HomeBlock.OPERATOR_HOME, m.extras.value.homeBlock)
+        m.dispatch(SetupIntent.MakeItClean)
+        settle()
+        val stopped = assertIs<SetupState.Stopped>(m.state.value)
+        assertEquals(StopCase.PLAN_REFUSED, stopped.card.case)
+        assertTrue(h.planner.requests.any { it is PlanRequest.WriteRestorePoint })
+        assertTrue(h.engine.calls.none { it is FakeEngine.Call.Start }, "no package write may start without a TV restore point")
+        assertTrue(h.logLines.any { "CANAL+ restore point could not be saved" in it })
+    }
+
     @Test fun probeSavesTheBaselineAndRecordsTheTvWithItsDraft() = runTest(timeout = 30.seconds) {
         val h = Harness()
         h.sessions.allowPromptFor[HOST] = "AB:CD:7F:2A"
@@ -596,10 +618,12 @@ class SetupMachineTest {
         m.effects.test {
             m.dispatch(SetupIntent.Finish)
             settle(3_100)
-            assertEquals(SetupEffect.Navigate("manage/${Samples.miTvId().value}"), drain().last())
+            assertTrue(drain().filterIsInstance<SetupEffect.Navigate>().isEmpty(), "must not leave setup with wireless debugging on")
         }
         assertEquals(3, h.discovery.probes.size - before, "three probes a second apart before recording on")
         assertEquals(DebugState.ON, h.tvs.tvs.value.single().debugging)
+        assertTrue(m.extras.value.finishFailed, "offer a visible retry after debug-off fails")
+        assertNull(m.extras.value.finishing)
         assertTrue(m.extras.value.finishing != Finishing.DONE)
         assertTrue(m.extras.value.chip != ChipState.DEBUGGING_OFF)
     }
@@ -1387,7 +1411,17 @@ class SetupMachineTest {
             h.sessions.allowPromptFor[HOST] = "AB:CD:7F:2A"
             h.prober.snapshotFor = { r ->
                 Samples.miTvSnapshot(reason = r).let { s ->
-                    s.copy(home = s.home.copy(claimants = s.home.claimants + tv.cleanyour.core.model.HomeClaimant(claimant, 1)))
+                    // The fixture is captured after debloat, with stock Home disabled. This
+                    // test checks how a failed switch classifies FallbackHome, so enable
+                    // stock Home first: RecoveryGate must refuse an unsafe starting state.
+                    val stock = Samples.stockLauncher.pkg
+                    // Build a fresh, correctly hashed baseline; the snapshot store refuses
+                    // modified content whose saved contentHash no longer matches.
+                    Samples.snapshot(
+                        reason = r,
+                        packages = s.packages + (stock to s.packages.getValue(stock).copy(enabled = tv.cleanyour.core.model.EnabledState.ENABLED)),
+                        home = s.home.copy(claimants = s.home.claimants + tv.cleanyour.core.model.HomeClaimant(claimant, 1)),
+                    )
                 }
             }
             h.setupPlan = h.plan(listOf(Op.Disable(adPkg)), takeover = true)

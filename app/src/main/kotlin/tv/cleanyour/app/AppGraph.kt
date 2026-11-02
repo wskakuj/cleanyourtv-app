@@ -73,6 +73,7 @@ import tv.cleanyour.core.registry.UrlConnectionFetcher
 import tv.cleanyour.core.spec.BundledFactsTable
 import tv.cleanyour.core.spec.BundledProfileSource
 import tv.cleanyour.core.spec.BundledThemeSource
+import tv.cleanyour.core.spec.TvToolkitProfileSource
 import tv.cleanyour.core.store.Clock
 import tv.cleanyour.core.trust.BundledCurtainPin
 import tv.cleanyour.core.trust.BundledLauncherPin
@@ -122,7 +123,8 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
     ))
     // Test build: the person's answers on Setup's candidate list card, which every resolve reads.
     val candidateChoices = tv.cleanyour.core.flows.CandidateChoices(documents)
-    val profiles = BundledProfileSource(consent = candidateChoices)
+    val bundledProfiles = BundledProfileSource(consent = candidateChoices)
+    val profiles = TvToolkitProfileSource(bundledProfiles)
     val facts = BundledFactsTable()
 
     // W3: renderer variant A (the nohup setsid watchdog) until S12 says otherwise.
@@ -162,6 +164,14 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
     // The Play build has no add-ons: its Store hands back a fetcher that never downloads.
     val fetcher = store.addOnFetcher {
         InstallableOnlyFetcher(ResumableArtifactFetcher(http, blobs, blobs, inspector, urlAllowed = hostAllowed)) { registry.installableIndex() }
+    }
+
+    // Toolkit-only: a separate, exact-host downloader for the two publisher-pinned APKs.
+    // Never widen the signed module registry's host trust list, or enable downloads in Play.
+    private val toolkitAllowed: (String) -> Boolean = { DownloadHosts.isAllowed(it, DownloadHosts.ALL + "gitlab.com") }
+    private val toolkitHttp = UrlConnectionFetcher(urlAllowed = toolkitAllowed)
+    val toolkitFetcher = store.addOnFetcher {
+        ResumableArtifactFetcher(toolkitHttp, blobs, blobs, inspector, urlAllowed = toolkitAllowed)
     }
 
     val seams = Seams(
@@ -205,11 +215,14 @@ class AppGraph(context: Context, val appVersion: String = versionOf(context), va
         curtainPin = curtainPin,   // RFC-CURTAIN-1
         store = store.rules,       // STORES-PLAN 1
         homeDecisions = homeDecisions,   // 0.3.2 B1
-        candidates = tv.cleanyour.core.flows.BundledCandidateLists(profiles, candidateChoices),   // test build
+        candidates = tv.cleanyour.core.flows.BundledCandidateLists(bundledProfiles, candidateChoices),   // test build
         about = about, connectDetail = { sessions.lastConnectFailure },   // 0.3.6: "Copy error"
         documents = documents,     // 0.4.0: the person's photo for the look step (OwnPicture)
         wrongFocus = { tvId -> wrongFocus.remove(tvId) },                 // issue #629
         restarts = restarts,       // 0.4.8
+        toolkitMode = store.rules.addOns, // Full build only; Play never installs an external APK.
+        toolkitFetcher = toolkitFetcher.takeIf { store.rules.addOns },
+        toolkitInspector = inspector,
     )
 
     val manageDeps = ManageDeps(

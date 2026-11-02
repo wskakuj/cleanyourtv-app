@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The full build (GitHub and F-Droid, STORES-PLAN 1); the Google Play build has its own in src/play.
-     SECURITY 4.4 and D41: no cleartext, system CAs only (no user CAs), the GitHub hosts named.
+     SECURITY 4.4 and D41: no cleartext, system CAs only (no user CAs), the official GitHub and GitLab release hosts named.
      Certificate Transparency is enforced on Android 16 and later. ADB sockets are raw TCP made by
      our code and are not governed by this file. The fetcher (W5) enforces the host allowlist
      itself; this file only removes cleartext and user-installed CAs. -->
@@ -15,6 +15,7 @@
         <domain includeSubdomains="false">api.github.com</domain>
         <domain includeSubdomains="false">objects.githubusercontent.com</domain>
         <domain includeSubdomains="false">release-assets.githubusercontent.com</domain>
+        <domain includeSubdomains="false">gitlab.com</domain>
         <certificateTransparency enabled="true" />
         <trust-anchors>
             <certificates src="system" />

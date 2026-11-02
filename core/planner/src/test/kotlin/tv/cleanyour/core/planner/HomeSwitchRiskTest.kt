@@ -27,8 +27,10 @@ import tv.cleanyour.core.planner.PlannerFixtures.snapshot
 import tv.cleanyour.core.planner.PlannerFixtures.wizard
 import tv.cleanyour.core.spec.BundledProfileSource
 import tv.cleanyour.core.spec.ProfileResolution
+import tv.cleanyour.core.spec.TvToolkitProfiles
 import tv.cleanyour.core.store.SnapshotCodec
 import tv.cleanyour.testing.fixtures.Issue036
+import tv.cleanyour.testing.fixtures.Samples
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -39,6 +41,21 @@ import kotlin.test.assertTrue
 // TVs no profile matches. The planner refuses such a switch asked for anyway; the clean-up alone
 // is planned as usual.
 class HomeSwitchRiskTest {
+    @Test fun canalOperatorHomeIsAlwaysKeptEvenWithAnExactProfile() {
+        val facts = Samples.miTvFacts().copy(
+            brand = "CANAL-PLUS", manufacturer = "SkyworthDigital", model = "CANAL PLUS BOX",
+            device = "HY40A2", sdk = 29,
+            fingerprint = "CANAL-PLUS/HY4001/HY40A2:10/QTT8.201201.002/C3.0.8_20220628:user/release-keys")
+        val stock = Component(PackageName("com.canal.box"), ".ui.boot.BoxMainActivity")
+        val fallback = Component(PackageName("com.android.tv.settings"), ".system.FallbackHome")
+        val home = HomeResolution(stock, listOf(HomeClaimant(stock, 2), HomeClaimant(fallback, -1000)))
+        val tv = Samples.miTvSnapshot().copy(facts = facts, home = home)
+        for (wifi in WizardWifi.entries) {
+            assertEquals(Risk.OPERATOR_HOME, HomeSwitchRisk.of(facts, TvToolkitProfiles.canal, tv, wifi, anyBrand = true))
+        }
+    }
+
+
     private val source = BundledProfileSource()
     private val shipped: Map<String, Profile> = BundledProfileSource.bundled.profiles.associateBy { it.id }
     private val tv = snapshot()   // the reference TV, its setup wizard installed and on

@@ -74,6 +74,27 @@
     <string name="found_home_row_rows">Home screen: {dock}, plus {count, plural, one {# app} other {# apps}} below</string>
     <string name="found_home_row_cd">Home screen dock: {dock}</string>
     <string name="found_home_change">Change</string>
+    <!-- Toolkit launcher selection: saved separately; installing an external APK is not enabled yet. -->
+    <string name="toolkit_launcher_row">Launcher preference: %1$s</string>
+    <string name="toolkit_launcher_title">Choose a launcher</string>
+    <string name="toolkit_launcher_keep">No change (keep current Home)</string>
+    <string name="toolkit_launcher_keep_note">Leave the TV menu as it is</string>
+    <string name="toolkit_launcher_flauncher" translatable="false">FLauncher</string>
+    <string name="toolkit_launcher_projectivy" translatable="false">Projectivy Launcher</string>
+    <string name="toolkit_launcher_preview_note">Choose a launcher. Choosing alone does not change the TV. You can install its official APK separately.</string>
+    <string name="toolkit_install_keeps_home">The TV keeps its current Home screen. Installation never disables the factory launcher.</string>
+    <string name="toolkit_install_button">Install %1$s on TV</string>
+    <string name="toolkit_install_installed">Launcher is installed. The TV keeps its current Home screen.</string>
+    <string name="toolkit_install_downloading">Downloading verified APK… %1$d%%</string>
+    <string name="toolkit_install_checking">Checking package, hash and signing certificate…</string>
+    <string name="toolkit_install_backup">Saving a restore point on the TV before installation…</string>
+    <string name="toolkit_install_installing">Installing the APK on TV and checking the result…</string>
+    <string name="toolkit_install_confirm_title">Install selected launcher?</string>
+    <string name="toolkit_install_confirm_note">This installs the APK only. It will not switch Home or disable the TV launcher.</string>
+    <string name="toolkit_install_confirm_warning">Only the publisher-pinned file and signing key are accepted. A restore point and phone confirmation are required. Keep the TV connected.</string>
+    <string name="toolkit_install_confirm_button">Install APK only</string>
+    <string name="toolkit_install_cancel">Cancel</string>
+    <string name="toolkit_finish_failed">Couldn\'t confirm that debugging was switched off. Check the TV\'s developer settings and tap Done to retry. For safety we haven\'t finished setup.</string>
     <!-- An empty dock: the row names the new home screen (UX 2 dock card title) instead of a blank list -->
     <string name="found_home_row_empty">Your new home screen</string>
     <string name="found_safety">A restore point is saved first, so everything can be put back.</string>
@@ -109,6 +130,7 @@
     <string name="kept_reason_fire_tv">Fire TV only allows its own home screen.</string>
     <string name="kept_reason_old_android">The new home screen needs Android 8 or newer.</string>
     <string name="kept_reason_unknown_home">We don\'t know this TV\'s home screen well enough to switch it safely.</string>
+    <string name="kept_reason_operator_home">CANAL+ BOX keeps the operator home screen for its TV services.</string>
     <string name="kept_reason_wizard_wifi">Its setup wizard holds the Wi-Fi, and switching needs the wizard off.</string>
     <string name="kept_reason_wizard_wifi_unknown">We couldn\'t check who saved its Wi-Fi.</string>
     <string name="kept_reason_casting">Switching would stop casting from phones after every restart.</string>
@@ -126,6 +148,7 @@
     <string name="found_home_old_android">The new home screen needs Android 8 or newer, and this TV runs an older one. So this TV keeps its own home screen.</string>
     <string name="found_home_changed">The home screen on this TV was already changed, by another app or an earlier change, and we don\'t undo a choice like that. So this TV keeps its own home screen.</string>
     <string name="found_home_unknown_stock">We don\'t know this TV\'s own home screen well enough to switch it safely. So this TV keeps its own home screen.</string>
+    <string name="found_home_operator">CANAL+ BOX uses its own home screen for CANAL+ TV and account services. To preserve normal operation, we keep that home screen and only offer optional app clean-up.</string>
     <!-- RF-SAFETY-250: home screen switches skipped up front for safety -->
     <string name="found_home_wizard_wifi">This TV\'s Wi-Fi was saved by its setup wizard. The new home screen needs the wizard off, which would forget the Wi-Fi, and with the wizard left on the TV can crash. So this TV keeps its own home screen.</string>
     <string name="found_home_wizard_wifi_unlisted">This TV\'s Wi-Fi was saved by its setup wizard, and we don\'t know this TV well enough yet to switch the wizard off safely. With the wizard left on, a new home screen can crash the TV. So this TV keeps its own home screen.</string>
@@ -149,6 +172,7 @@
     <string name="kept_next_patchwall_feeds">To get the new one, switch PatchWall off under Adverts and sponsored rows in Customise.</string>
     <string name="kept_next_list">What would change this is a list made for this TV. Help add this TV sends us its report; we make the list from reports like yours and post in your issue when there\'s one to try.</string>
     <string name="kept_next_nothing">This comes from the TV itself, so no update of this app changes it. The clean-up is the whole of what it gets.</string>
+    <string name="kept_next_operator">Keep the CANAL+ home screen enabled. Installing another launcher separately does not change Home; we do not offer automatic takeover on this firmware.</string>
 
     <!-- S3a Customise sheet -->
     <string name="customise_title">Customise</string>
@@ -444,4 +468,6 @@
     <string name="helper_consent_off">You can switch it off any time: here, with Undo, or on the TV in Settings &gt; Accessibility &gt; Home button.</string>
     <string name="helper_consent_yes">Switch on the helper</string>
     <string name="helper_consent_no">Not now</string>
+    <string name="tvtoolkit_found_no_selection">Nothing selected to switch off</string>
+    <string name="tvtoolkit_found_choose_optional">The original Home stays in use. Optional packages are available; open Customise to decide whether to disable any. Nothing changes until you approve.</string>
 </resources>

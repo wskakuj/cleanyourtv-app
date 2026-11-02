@@ -124,7 +124,7 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
             val checked = msg(R.string.manage_checked, "date" to shortDate(tv.checkedAtMs, locale))
             TvCard(
                 name = if (room != null) msg(R.string.manage_tv_title, "tv" to tv.name, "room" to room) else msg(R.string.manage_tv_title_noroom, "tv" to tv.name),
-                statusLine = "$stateWord. $checked.",
+                statusLine = if (state.toolkitMode) listOfNotNull(tv.brand, tv.model, stateWord, checked).joinToString(" · ") else "$stateWord. $checked.",
                 thumbnail = rememberPng(tv.thumbnail),
                 thumbnailDescription = msg(R.string.manage_thumbnail_cd, "tv" to tv.name),
                 modifier = Modifier.padding(top = 20.dp),
@@ -136,6 +136,17 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
             // 0.4.7 (StockHomeBack): the TV turned its own home screen back on, so Run Setup again is the way back.
             if (!tv.clean || tv.stockHomeBack) PrimaryButton(stringResource(R.string.manage_clean_again), { onIntent(ManageIntent.CleanAgain) }, Modifier.padding(top = 16.dp), guardObscured = false)
             else SecondaryButton(stringResource(R.string.manage_clean_again), { onIntent(ManageIntent.CleanAgain) }, Modifier.padding(top = 16.dp))
+            if (state.toolkitMode) {
+                ListGroup(Modifier.padding(top = 16.dp)) {
+                    ListRow(stringResource(R.string.tvtoolkit_manage_ai), subtitle = stringResource(R.string.tvtoolkit_manage_ai_sub),
+                        onClick = { onIntent(ManageIntent.ReviewWithAi) })
+                    ListDivider()
+                    ListRow(stringResource(R.string.tvtoolkit_manage_launcher),
+                        subtitle = tv.activeHome?.let { stringResource(R.string.tvtoolkit_manage_active_home, it) }
+                            ?: stringResource(R.string.tvtoolkit_manage_active_unknown),
+                        onClick = { onIntent(ManageIntent.ChooseLauncher) })
+                }
+            }
             // 0.3.2 B1: an unlisted TV (no exact profile) invites the person to help add it.
             // 0.4.7 (must 4): once its report was sent, the banner says when and that the issue is
             // where news comes; sending again stays one tap away.
@@ -188,7 +199,8 @@ fun ManageScreen(state: ManageState, onIntent: (ManageIntent) -> Unit, modifier:
                     ListRow(msg(R.string.manage_row_better_back_on, "count" to tv.betterBackOn), onClick = { onIntent(ManageIntent.Open(ManageSection.SWITCHED_OFF)) })
                     ListDivider()
                 }
-                ListRow(msg(R.string.manage_row_switched_off, "count" to tv.switchedOff), subtitle = stringResource(R.string.manage_row_switched_off_sub),
+                ListRow(msg(R.string.manage_row_switched_off, "count" to tv.switchedOff),
+                    subtitle = if (state.toolkitMode) stringResource(R.string.tvtoolkit_disabled_summary, tv.switchedOff, tv.disabledTotal) else stringResource(R.string.manage_row_switched_off_sub),
                     onClick = { onIntent(ManageIntent.Open(ManageSection.SWITCHED_OFF)) })
                 ListDivider()
                 ListRow(stringResource(R.string.manage_row_leftovers), subtitle = stringResource(R.string.manage_row_leftovers_sub),
@@ -331,13 +343,14 @@ internal fun ColumnScope.OpenWriteContent(
 // M4 Switched off: "Put back" is one op with a 5 s undo snackbar (the app shows the snackbar).
 @Composable
 fun SwitchedOffScreen(state: SwitchedOffState, onIntent: (SwitchedOffIntent) -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
+    var pendingExternal by rememberSaveable { mutableStateOf<String?>(null) }
     ScreenScaffold(Glow.Tv, modifier, topBar = { CytTopBar(onBack = onBack) }) {
-        ScreenTitle(msg(R.string.switchedoff_title, "count" to state.count), titleTop)
+        ScreenTitle(msg(R.string.switchedoff_title, "count" to if (state.toolkitMode) state.totalCount else state.count), titleTop)
         if (state.loading) {
             Box(Modifier.fillMaxWidth().padding(top = 32.dp), contentAlignment = Alignment.Center) { Spinner(size = 24.dp) }
             return@ScreenScaffold
         }
-        if (state.groups.isEmpty() && state.askGroups.isEmpty()) {
+        if (state.groups.isEmpty() && state.askGroups.isEmpty() && state.external.isEmpty()) {
             Lead(stringResource(R.string.switchedoff_empty), Modifier.padding(top = 12.dp))
             Body(stringResource(R.string.switchedoff_empty_sub), Modifier.padding(top = 8.dp))
         } else {
@@ -360,14 +373,45 @@ fun SwitchedOffScreen(state: SwitchedOffState, onIntent: (SwitchedOffIntent) -> 
             }
         }
         // Custom adds the ask groups with Off / Kept pills and the package names in grey (D2).
+        if (state.toolkitMode) {
+            Body(stringResource(R.string.tvtoolkit_disabled_summary, state.oursCount, state.totalCount),
+                Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
+            if (!state.fresh) Banner(stringResource(R.string.tvtoolkit_external_cached),
+                BannerTone.INFO, Modifier.padding(top = 12.dp))
+        }
+        if (state.external.isNotEmpty()) {
+            SectionLabel(stringResource(R.string.tvtoolkit_external_title))
+            Body(stringResource(if (state.fresh) R.string.tvtoolkit_external_intro else R.string.tvtoolkit_external_cached),
+                Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp))
+            ListGroup(Modifier.padding(top = 12.dp)) {
+                state.external.forEachIndexed { i, row ->
+                    if (i > 0) ListDivider()
+                    ListRow(row.name, subtitle = row.pkg.value, trailing = {
+                        TertiaryButton(stringResource(R.string.tvtoolkit_external_enable),
+                            { pendingExternal = row.pkg.value }, enabled = state.fresh && state.busy == null)
+                    })
+                }
+            }
+        }
+        if (state.toolkitMode) SecondaryButton(stringResource(R.string.tvtoolkit_inventory_refresh),
+            { onIntent(SwitchedOffIntent.Refresh) }, Modifier.padding(top = 12.dp), enabled = state.busy == null)
         state.askGroups.forEach { g ->
             val group = DiffGroup(g.id, g.title, g.rows.map { DiffItem(it.pkg.value, it.name, it.description.orEmpty(), it.pkg.value, it.off) })
             DiffGroupSection(
-                group, { item -> if (state.busy == null) onIntent(SwitchedOffIntent.SetOff(PackageName(item.key), !item.off)) },
+                group, { item -> if (state.busy == null) {
+                    if (item.off && state.external.any { it.pkg.value == item.key }) pendingExternal = item.key
+                    else onIntent(SwitchedOffIntent.SetOff(PackageName(item.key), !item.off))
+                } },
                 Modifier.padding(top = 20.dp), showPackageNames = true,
             )
         }
         Gap(24.dp)
+    }
+    pendingExternal?.let { pkg ->
+        ExternalRestoreConfirm(pkg, onConfirm = {
+            pendingExternal = null
+            onIntent(SwitchedOffIntent.ConfirmExternalPutBack(PackageName(pkg)))
+        }, onDismiss = { pendingExternal = null })
     }
 }
 
@@ -384,6 +428,20 @@ private fun BetterBackOnGroup(g: OffGroup, busy: PackageName?, onIntent: (Switch
                 else TertiaryButton(stringResource(R.string.switchedoff_switch_back_on), { onIntent(SwitchedOffIntent.PutBack(r.pkg)) },
                     Modifier.semantics { contentDescription = cd }, enabled = busy == null)
             })
+        }
+    }
+}
+
+// Another tool may have intentionally disabled a package. Never undo that without a second tap.
+@Composable
+private fun ExternalRestoreConfirm(pkg: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    CytBottomSheet(onDismiss) {
+        SheetHeader(stringResource(R.string.tvtoolkit_external_confirm))
+        Body(stringResource(R.string.tvtoolkit_external_confirm_body), Modifier.padding(top = 12.dp))
+        MonospaceBlock(listOf(pkg), wrap = true)
+        ActionColumn(Modifier.padding(top = 18.dp)) {
+            PrimaryButton(stringResource(R.string.tvtoolkit_external_enable), onConfirm)
+            TertiaryButton(stringResource(R.string.action_cancel), onDismiss)
         }
     }
 }

@@ -40,6 +40,7 @@
     <string name="home_not_on_tv_refuses">{brand} only allows its own home screen, so Setup didn\'t add ours. The clean-up works without it.</string>
     <string name="home_not_on_tv_old_android">The new home screen needs Android 8 or newer, so Setup didn\'t add it. The clean-up works without it.</string>
     <string name="home_not_on_tv_unknown_home">We don\'t know this TV\'s own home screen well enough to switch it safely, so Setup left it alone.</string>
+    <string name="home_not_on_tv_operator_home">The CANAL+ home screen is part of the operator experience. To protect CANAL+ features and the remote, Setup keeps it enabled. You can still choose safe clean-up items.</string>
     <string name="home_not_on_tv_wizard_wifi">This TV\'s Wi-Fi was saved by its setup wizard. The new home screen needs the wizard off, which would forget the Wi-Fi, and with the wizard left on the TV can crash. So Setup left the home screen alone.</string>
     <string name="home_not_on_tv_wizard_wifi_unlisted">This TV\'s Wi-Fi was saved by its setup wizard, and we don\'t know this TV well enough yet to switch the wizard off safely. With the wizard left on, a new home screen can crash the TV, so Setup left it alone.</string>
     <string name="home_not_on_tv_wizard_wifi_unknown">We couldn\'t check who saved this TV\'s Wi-Fi. The new home screen needs the setup wizard off, which could forget the Wi-Fi, so Setup left the home screen alone.</string>

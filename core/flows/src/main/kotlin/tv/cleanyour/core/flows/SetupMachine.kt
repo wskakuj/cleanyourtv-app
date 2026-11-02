@@ -2,6 +2,7 @@ package tv.cleanyour.core.flows
 
 import tv.cleanyour.core.planner.HomeHelper
 import tv.cleanyour.core.spec.HomeHelperKeys
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
@@ -31,8 +32,10 @@ import tv.cleanyour.core.model.BlobRef
 import tv.cleanyour.core.model.Component
 import tv.cleanyour.core.model.ConnectionState
 import tv.cleanyour.core.model.DebugState
+import tv.cleanyour.core.model.ApkInfo
 import tv.cleanyour.core.model.DeviceFacts
 import tv.cleanyour.core.model.Endpoint
+import tv.cleanyour.core.model.FileRoute
 import tv.cleanyour.core.model.LauncherState
 import tv.cleanyour.core.model.Level
 import tv.cleanyour.core.model.Op
@@ -81,7 +84,10 @@ import tv.cleanyour.core.spec.ProfileResolution
 import tv.cleanyour.core.planner.PatchWallFeeds
 import tv.cleanyour.core.spec.ProfileSource
 import tv.cleanyour.core.spec.ThemeSource
+import tv.cleanyour.core.spec.TvToolkitProfiles
 import tv.cleanyour.core.spec.resolveFor
+import tv.cleanyour.core.registry.ArtifactFetcher
+import tv.cleanyour.core.registry.FetchResult
 import tv.cleanyour.core.store.BlobStore
 import tv.cleanyour.core.store.Clock
 import tv.cleanyour.core.store.DocumentStore
@@ -91,6 +97,7 @@ import tv.cleanyour.core.store.SnapshotStore
 import tv.cleanyour.core.store.TvRepository
 import tv.cleanyour.core.trust.CurtainPin
 import tv.cleanyour.core.trust.LauncherPin
+import tv.cleanyour.core.trust.ApkInspector
 
 // How the wizard starts (ARCHITECTURE 2.2 start destination): fresh from Welcome, continuing a
 // WizardDraft at the TV's remembered address, or at the resume prompt for a run with no End.
@@ -105,6 +112,7 @@ data class IdentityCheck(val model: String, val serialLast4: String, val screens
 data class ThemeOption(val id: String, val name: String, val description: String, val wallpaperPath: String? = null)
 enum class Reconnect { TRYING, BACK, GAVE_UP }
 enum class Finishing { SWITCHING, DONE }
+enum class ToolkitInstallStage { IDLE, DOWNLOADING, CHECKING, BACKUP, INSTALLING, INSTALLED, FAILED }
 
 // Why S3 offers no new home screen (RF-PROFILES-63 P1, P2); NONE when the switch is offered. The
 // five after UNKNOWN_HOME are the switches skipped up front for safety (RF-SAFETY-250, HomeSwitchRisk).
@@ -115,7 +123,7 @@ enum class Finishing { SWITCHING, DONE }
 // VENDOR_HOME (beta4, issue #825): a system service's FallbackHome claims Home (HomeSwitchRisk).
 // PATCHWALL_FEEDS (beta4, issue #945): PatchWall stays on while Mi TV+ or its web content is off, not by
 // this app (HomeSwitchRisk, PatchWallFeeds).
-enum class HomeBlock { NONE, TV_REFUSES, OLD_ANDROID, UNKNOWN_HOME, WIZARD_WIFI, WIZARD_WIFI_UNKNOWN, CASTING, BOOT_LOOP,
+enum class HomeBlock { NONE, TV_REFUSES, OLD_ANDROID, UNKNOWN_HOME, OPERATOR_HOME, WIZARD_WIFI, WIZARD_WIFI_UNKNOWN, CASTING, BOOT_LOOP,
     WIZARD_STAYS_ON, HOME_CHANGED, REMOTE_BUTTONS, OTHER_HOME, VENDOR_HOME, PATCHWALL_FEEDS }
 
 // Why a run changed nothing, for Done's body (0.3.3): nothing was planned to switch off (on a TV
@@ -150,6 +158,12 @@ data class SetupExtras(
     val connectError: ConnectError? = null,      // 0.3.6: the TV's port answered, the connection failed; the door's card and "Copy error"
     val staleNotice: Boolean = false,            // the TV changed under the plan; a new plan is shown
     val finishing: Finishing? = null,            // D7 "Switching debugging off... done."
+    val finishFailed: Boolean = false,           // Debugging shutdown could not be confirmed; do not silently leave Setup.
+    val toolkitLauncher: ToolkitLauncher = ToolkitLauncher.KEEP_STOCK,
+    val toolkitMode: Boolean = false,
+    val toolkitInstallStage: ToolkitInstallStage = ToolkitInstallStage.IDLE,
+    val toolkitInstallPercent: Int = 0,
+    val toolkitInstallError: String? = null,
     val keepsDebugging: Boolean = false,         // D7: "Keep debugging on" was chosen, so Finish leaves it on and Done says so
     val restartSlow: Boolean = false,            // UX 4.8 at 3 minutes
     val restartReenabled: Int = 0,               // "2 things came back on after the restart; switched off again."
@@ -269,6 +283,9 @@ class SetupDeps(
     val homeHelper: Boolean = tv.cleanyour.core.planner.HomeHelper.BUILD_ON,
     // 0.4.8: where the restarts are counted (Restarts); the app gives Manage the same one. Null counts none.
     val restarts: Restarts? = documents?.let { Restarts(it) },
+    val toolkitMode: Boolean = false,
+    val toolkitFetcher: ArtifactFetcher? = null,
+    val toolkitInspector: ApkInspector? = null,
 )
 
 // The first-run wizard, screens S1 to S5 (PRODUCT-SPEC 4, UX 2 and 4). One machine per wizard run,
@@ -280,7 +297,7 @@ class SetupMachine(
     private val start: SetupStart = SetupStart.Fresh,
 ) : Machine<SetupState, SetupIntent, SetupEffect>(initialState(start), scope), SetupActions {
 
-    private val mutableExtras = MutableStateFlow(SetupExtras(addOns = deps.store.addOns))
+    private val mutableExtras = MutableStateFlow(SetupExtras(addOns = deps.store.addOns, toolkitMode = deps.toolkitMode))
     val extras: StateFlow<SetupExtras> = mutableExtras.asStateFlow()
 
     // Live context of this wizard run. Only handlers touch it.
@@ -539,10 +556,26 @@ class SetupMachine(
                     }
                 }.onFailure { deps.log.line("setup: the photo could not be staged") }
             }
+            SetupIntent.InstallToolkitLauncher -> if (deps.toolkitMode && after is SetupState.Found && !mutableExtras.value.starting && mutableExtras.value.finishing == null &&
+                mutableExtras.value.toolkitInstallStage !in setOf(ToolkitInstallStage.DOWNLOADING, ToolkitInstallStage.CHECKING, ToolkitInstallStage.BACKUP, ToolkitInstallStage.INSTALLING)) {
+                val choice = mutableExtras.value.toolkitLauncher
+                if (ToolkitLauncherCatalog.forChoice(choice) != null) {
+                    mutableExtras.update { it.copy(toolkitInstallStage = ToolkitInstallStage.DOWNLOADING, toolkitInstallPercent = 0, toolkitInstallError = null) }
+                    scope.launch { installToolkitLauncher(after.tvId, choice) }
+                }
+            }
             is SetupIntent.KeepDebuggingOn -> editDraft { it.copy(keepDebuggingOn = event.on) }
+            is SetupIntent.ChooseToolkitLauncher -> if (after is SetupState.Found && mutableExtras.value.toolkitInstallStage !in setOf(ToolkitInstallStage.DOWNLOADING, ToolkitInstallStage.CHECKING, ToolkitInstallStage.BACKUP, ToolkitInstallStage.INSTALLING)) {
+                mutableExtras.update { it.copy(toolkitLauncher = event.launcher, toolkitInstallStage = ToolkitInstallStage.IDLE, toolkitInstallError = null, toolkitInstallPercent = 0) }
+                deps.documents?.let { documents -> scope.launch {
+                    attempt { ToolkitPreferencesStore(documents).saveLauncher(after.tvId, event.launcher) }
+                        .onFailure { deps.log.line("setup: launcher preference could not be saved") }
+                } }
+            }
             is SetupIntent.ShowOnTv -> editDraft { it.copy(curtain = event.on) }
             is SetupIntent.HomeHelper -> if (deps.homeHelper) editDraft { it.copy(homeHelper = event.on) }
-            SetupIntent.MakeItClean -> if (after is SetupState.Found && !mutableExtras.value.starting) {
+            SetupIntent.MakeItClean -> if (after is SetupState.Found && !mutableExtras.value.starting &&
+                mutableExtras.value.toolkitInstallStage !in setOf(ToolkitInstallStage.DOWNLOADING, ToolkitInstallStage.CHECKING, ToolkitInstallStage.BACKUP, ToolkitInstallStage.INSTALLING)) {
                 mutableExtras.update { it.copy(starting = true) }
                 scope.launch {
                     // A Keep, dock or theme change just before the tap replans in the background; the
@@ -572,7 +605,11 @@ class SetupMachine(
             SetupIntent.Finish -> if (after is SetupState.Done && mutableExtras.value.finishing == null) scope.launch { finish(after.tvId) }
             // 0.4.7 (UX finding 5, PM 7): "Done" on a plan with nothing to switch off and the TV's
             // own home screen kept: no credential prompt, no empty run; the draft ends here.
-            SetupIntent.LeaveAsIs -> if (after is SetupState.Found && !mutableExtras.value.starting && mutableExtras.value.finishing == null) scope.launch { leaveAsIs(after.tvId) }
+            SetupIntent.LeaveAsIs -> if (after is SetupState.Found && !mutableExtras.value.starting && mutableExtras.value.finishing == null &&
+                mutableExtras.value.toolkitInstallStage !in setOf(ToolkitInstallStage.DOWNLOADING, ToolkitInstallStage.CHECKING, ToolkitInstallStage.BACKUP, ToolkitInstallStage.INSTALLING)) {
+                mutableExtras.update { it.copy(finishing = Finishing.SWITCHING, finishFailed = false) }
+                scope.launch { leaveAsIs(after.tvId) }
+            }
             is Ev.Run -> onRun(before, event)
             is SetupIntent.StopAction -> onStopAction(after, event.action)
             else -> {}
@@ -770,6 +807,10 @@ class SetupMachine(
                 "${launchable?.size?.let { "$it launchable" } ?: "launchable unknown"}, profile ${LogCodes.profile(res)}, ${LogCodes.tv(facts)}")
             val record = upsertTv(s, facts, res)
             tv = record
+            deps.documents?.let { documents ->
+                val saved = attempt { ToolkitPreferencesStore(documents).loadLauncher(tvId) }.getOrNull()
+                if (saved != null) mutableExtras.update { it.copy(toolkitLauncher = saved) }
+            }
             // Test build: a list not tested yet waits for the person's answer on the card.
             val candidate = deps.candidates?.offer(facts, snap.home, snap.packages)
             if (candidate != null) {
@@ -892,6 +933,7 @@ class SetupMachine(
             risk == HomeSwitchRisk.Risk.BOOT_LOOP -> HomeBlock.BOOT_LOOP
             risk == HomeSwitchRisk.Risk.CASTING -> HomeBlock.CASTING
             risk == HomeSwitchRisk.Risk.REMOTE_BUTTONS -> HomeBlock.REMOTE_BUTTONS
+            risk == HomeSwitchRisk.Risk.OPERATOR_HOME -> HomeBlock.OPERATOR_HOME
             anotherKey || (stockUnknown && StockHome.changedByPerson(snap, stocks)) -> HomeBlock.HOME_CHANGED
             (p != null && p.stockLaunchers.isEmpty()) || stockUnknown -> HomeBlock.UNKNOWN_HOME
             risk == HomeSwitchRisk.Risk.WIZARD_WIFI -> HomeBlock.WIZARD_WIFI
@@ -952,12 +994,14 @@ class SetupMachine(
         // RFC-HELPER-1 (test build): the Home button helper instead of the switch, when the person
         // switched it on in Customise and this TV meets its rules (HomeHelper.refusal, as the planner).
         val helperStock = helperStock(snap, block)
-        val helper = helperStock != null && draft.homeHelper
+        val helper = !deps.toolkitMode && helperStock != null && draft.homeHelper
         val possible = block == HomeBlock.NONE && !helper
         val choices = Choices(
             kept = draft.kept, extraOff = draft.extraOff, dock = dock,
             theme = theme,
-            installLauncher = possible || helper, takeover = possible, homeHelper = helper,
+            // The Toolkit fork never installs the upstream bundled launcher or silently takes Home.
+            // Optional external launchers are a separate pinned, install-only action below.
+            installLauncher = !deps.toolkitMode && (possible || helper), takeover = !deps.toolkitMode && possible, homeHelper = helper,
             replaceLauncherSigner = installed?.signer?.let { it != launcher.signer } ?: false,
             keepDebuggingOn = draft.keepDebuggingOn,
             wizardWifi = wifi,
@@ -1135,11 +1179,43 @@ class SetupMachine(
         val s = session
         if (record == null || s == null) { mutableExtras.update { it.copy(starting = false) }; return }
         mutableExtras.update { it.copy(starting = true) }
+        // TV Toolkit: a successful probe must have produced a durable restore point. For any
+        // Home switch, a TV-side watchdog and a still-enabled stock home are mandatory. A dead
+        // phone cannot undo a lost launcher, so refuse the whole plan before its first write.
+        val baseline = attempt { deps.snapshots.baseline(record.id) }.getOrNull()
+        val safety = RecoveryGate.refusal(baseline, snapshot, plan.steps.map { it.op })
+        if (safety != null) {
+            deps.log.line("setup: recovery preflight refused: ${LogCodes.clean(safety, 160)}")
+            mutableExtras.update { it.copy(starting = false) }
+            send(Ev.Stop(record.id, card(StopCase.PLAN_REFUSED, plan.id).copy(
+                title = "Zabezpieczenie przed awaria",
+                body = safety + " Uruchom analize telewizora ponownie przed kolejna proba.",
+            )))
+            return
+        }
         var pass = given ?: deps.gate.cached(record.id)
         if (pass == null && GateKeeper.needsPass(plan)) {
             effect(SetupEffect.RequestCredential)
             pass = deps.gate.pass(record.id, record.nickname)
             if (pass == null) { mutableExtras.update { it.copy(starting = false) }; return }
+        }
+        // The CANAL+ operator Home remains untouched. Before any opt-in package disable,
+        // put a restore-point file on the box itself, not just in phone storage. A failed
+        // ADB push stops this plan before the first package is changed.
+        if (profile()?.id == TvToolkitProfiles.CANAL_ID && plan.steps.any { it.op is Op.Disable }) {
+            // The restore-point transfer itself touches ADB; the background session guard
+            // must still switch debugging off if Setup cannot reach the main plan afterward.
+            deps.sessionEnd.touched(record.id)
+            val saved = attempt { deps.restorePoint.writeVerified(record, s, profile()) }.getOrDefault(false)
+            if (!saved) {
+                deps.log.line("setup: CANAL+ restore point could not be saved; no packages disabled")
+                mutableExtras.update { it.copy(starting = false) }
+                send(Ev.Stop(record.id, card(StopCase.PLAN_REFUSED, plan.id).copy(
+                    title = "Nie zapisano punktu przywracania",
+                    body = "Nie udalo sie zapisac kopii na CANAL+ BOX. Niczego nie wylaczono.",
+                )))
+                return
+            }
         }
         mutableExtras.update { it.copy(noScreenLock = deps.gate.noScreenLock(record.id) || it.noScreenLock) }
         earlierRuns.clear()
@@ -1722,10 +1798,101 @@ class SetupMachine(
     private fun keepsDebugging(tvId: TvId): Boolean =
         tv?.wizard?.keepDebuggingOn == true || mutableExtras.value.draft?.keepDebuggingOn == true || deps.sessionEnd.keepsDebuggingOn(tvId)
 
+    // Toolkit-only external APK installation. A pinned APK is installed as an ordinary app;
+    // never set Home, disable stock Home, touch accessibility or alter the TV's launcher settings.
+    // Every write remains journaled, gated and preceded by a checked restore point.
+    private suspend fun installToolkitLauncher(tvId: TvId, choice: ToolkitLauncher) {
+        fun stage(next: ToolkitInstallStage, percent: Int = 0, error: String? = null) {
+            mutableExtras.update { it.copy(toolkitInstallStage = next, toolkitInstallPercent = percent, toolkitInstallError = error) }
+        }
+        fun fail(why: String) {
+            deps.log.line("setup: pinned launcher install refused")
+            stage(ToolkitInstallStage.FAILED, error = why)
+        }
+        try {
+            val pin = ToolkitLauncherCatalog.forChoice(choice) ?: return fail("No launcher was selected.")
+            val fetcher = deps.toolkitFetcher ?: return fail("This build has no verified launcher downloader.")
+            val inspector = deps.toolkitInspector ?: return fail("APK signature verification is unavailable.")
+            val record = tv?.takeIf { it.id == tvId } ?: return fail("The connected TV changed.")
+            val live = session?.takeIf { it.tvId == tvId } ?: return fail("The TV is no longer connected.")
+            val baseline = deps.snapshots.baseline(tvId)
+            val current = deps.runner.freshSnapshot(live)
+            RecoveryGate.refusal(baseline, current, emptyList())?.let { return fail(it) }
+            pin.refusal(current.facts, current.packages[pin.pkg])?.let { return fail(it) }
+            if (current.packages.containsKey(pin.pkg)) {
+                // Never overwrite a previously installed, correctly signed launcher simply because
+                // a selected release happens to have a different version code.
+                return stage(ToolkitInstallStage.INSTALLED)
+            }
+            val pass = deps.gate.pass(tvId, record.nickname)
+                ?: return fail("The phone's confirmation was cancelled. Nothing installed.")
+            stage(ToolkitInstallStage.DOWNLOADING)
+            val download = fetcher.fetch(pin.artifact) { done, total ->
+                val pct = if (total > 0) ((done * 100) / total).toInt().coerceIn(0, 100) else 0
+                mutableExtras.update { it.copy(toolkitInstallPercent = pct) }
+            }
+            val blob = (download as? FetchResult.Ok)?.blob
+                ?: return fail("Official APK download or checksum verification failed: ${(download as? FetchResult.Failed)?.failure ?: "unknown"}.")
+            stage(ToolkitInstallStage.CHECKING)
+            val apk = inspector.inspect(blob)
+            if (!pin.accepts(apk)) return fail("The APK package, hash, version or signing certificate did not match the trusted release.")
+            val (module, version) = pin.module(apk!!)
+            val request = PlanRequest.AddModule(module, version, blob)
+            val planned = deps.runner.plan(record, request, current)
+            val plan = (planned as? PlanResult.Ok)?.plan
+                ?: return fail("The TV refused the installation plan. No launcher was changed.")
+            // Older ADB implementations install a temporary file instead of streaming the APK.
+            // Allow only that exact verified file in TMP; no settings, launcher takeover,
+            // package disables or other device changes may enter this independent plan.
+            val uploaded = plan.steps.mapNotNull { (it.op as? Op.PushAsset)?.dest }.singleOrNull()
+            val safeSteps = plan.steps.all { step -> when (val op = step.op) {
+                is Op.InstallStream -> op.blob == blob && op.sha256 == pin.artifact.sha256 &&
+                    op.pkg == pin.pkg && op.signer == pin.artifact.signer
+                is Op.Install -> uploaded != null && op.apk == uploaded && op.apk.dir == RemoteDir.TMP &&
+                    op.sha256 == pin.artifact.sha256 && op.pkg == pin.pkg && op.signer == pin.artifact.signer
+                is Op.Mkdir -> op.dir == RemoteDir.TMP
+                is Op.PushAsset -> op.src == blob && op.sha256 == pin.artifact.sha256 && op.dest.dir == RemoteDir.TMP && op.route == FileRoute.SYNC
+                is Op.RemoveFile -> uploaded != null && op.path == uploaded && op.route == FileRoute.SYNC
+                Op.PressHome -> true
+                else -> false
+            } }
+            if (!safeSteps || plan.steps.count { it.op is Op.Install || it.op is Op.InstallStream } != 1) {
+                return fail("The installation plan included an unexpected action; it was stopped.")
+            }
+            RecoveryGate.refusal(baseline, current, plan.steps.map { it.op })?.let { return fail(it) }
+            stage(ToolkitInstallStage.BACKUP)
+            if (!deps.restorePoint.write(record, live, profile())) {
+                return fail("A restore point could not be saved to the TV. Nothing installed.")
+            }
+            stage(ToolkitInstallStage.INSTALLING)
+            val outcome = deps.runner.run(record, plan, live, pass, onStarted = { deps.sessionEnd.touched(tvId) }) {
+                if (it is RunState.Running) mutableExtras.update { e -> e.copy(toolkitInstallPercent = it.percent) }
+            }
+            if (outcome !is RunOutcome.Finished || outcome.state.status !in setOf(RunStatus.COMPLETED, RunStatus.COMPLETED_WITH_SKIPS)) {
+                return fail("The TV did not complete the installation. Check the recovery screen before retrying.")
+            }
+            val after = deps.runner.freshSnapshot(live)
+            val installed = after.packages[pin.pkg]
+            if (installed == null || installed.signer != pin.artifact.signer || installed.versionCode < apk.versionCode) {
+                return fail("The TV did not confirm the expected package and signing key after installation.")
+            }
+            attempt { deps.restorePoint.write(record, live, profile()) }
+            deps.log.line("setup: pinned launcher ${choice.name} installed, Home not changed")
+            stage(ToolkitInstallStage.INSTALLED, 100)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            fail("The connection or installation failed. TV Home was not changed.")
+        }
+    }
+
     // 0.4.7: Setup ends without a run (nothing to switch off, the TV keeps its own home screen). The
     // draft is cleared so the app does not reopen the wizard, then Finish's own steps.
     private suspend fun leaveAsIs(tvId: TvId) {
-        val record = tv ?: deps.tvs.tvs.value.firstOrNull { it.id == tvId } ?: return
+        val record = tv ?: deps.tvs.tvs.value.firstOrNull { it.id == tvId } ?: run {
+            mutableExtras.update { it.copy(finishing = null, finishFailed = true) }
+            return
+        }
         deps.log.line("setup: left as is, nothing to switch off")
         val done = record.copy(wizard = null, lastSeenAt = deps.clock.nowMs())
         tv = done
@@ -1737,13 +1904,17 @@ class SetupMachine(
     private suspend fun finish(tvId: TvId) {
         val keep = keepsDebugging(tvId)
         if (!keep) {
-            mutableExtras.update { it.copy(finishing = Finishing.SWITCHING) }
-            // "done" and the "Debugging off" chip only when a failed probe confirmed it (D7); otherwise
-            // Manage opens at once and its card shows what the record says.
-            if (deps.sessionEnd.switchOff(tvId) == DebugState.OFF) {
-                mutableExtras.update { it.copy(finishing = Finishing.DONE, chip = ChipState.DEBUGGING_OFF) }
-                delay(600)
+            mutableExtras.update { it.copy(finishing = Finishing.SWITCHING, finishFailed = false) }
+            // Finishing can take time on some firmware. A hung ADB connection must not make Done
+            // appear inert, or silently leave wireless debugging on. Allow retry on a failure.
+            val result = attempt { withTimeoutOrNull(15_000) { deps.sessionEnd.switchOff(tvId) } }.getOrNull()
+            if (result != DebugState.OFF) {
+                deps.log.line("setup: could not confirm debugging is off; finish needs a retry")
+                mutableExtras.update { it.copy(finishing = null, finishFailed = true) }
+                return
             }
+            mutableExtras.update { it.copy(finishing = Finishing.DONE, chip = ChipState.DEBUGGING_OFF) }
+            delay(600)
         }
         effect(SetupEffect.Navigate("manage/${tvId.value}"))
     }

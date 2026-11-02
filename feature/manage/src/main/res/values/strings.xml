@@ -6,7 +6,12 @@
   no Android plurals elements. Counts go through the plural selector.
   Screens: M1, M1a, M4, M5, M7, M8 and the credential prompt for the actions raised from them.
 -->
-<resources>
+<!--
+  TV Toolkit adds a small Polish translation to this formerly English-only module.
+  Existing upstream strings intentionally fall back to English until the full Polish
+  translation is ready. Suppress only MissingTranslation here; keep every other lint check.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
 
     <!-- Shared button words -->
     <string name="action_back">Back</string>
@@ -286,4 +291,61 @@
     <string name="report_issue_error">That isn\'t a link to an issue of this app on GitHub.</string>
     <string name="report_issue_save">Remember it</string>
     <string name="report_issue_open">Open the issue</string>
+    <!-- TV Toolkit: human-reviewed AI import for an unknown Android TV. No execution here. -->
+    <string name="tvtoolkit_ai_title">Ask AI about this TV</string>
+    <string name="tvtoolkit_ai_intro">Copy a device-specific prompt with installed and disabled packages. Paste the AI reply here. Only names from this device can pass validation; no ADB command from AI is ever executed.</string>
+    <string name="tvtoolkit_ai_privacy">The full inventory includes the names of apps you installed. Review it before pasting it into an external AI service. No serial number, IP address or ADB key is included.</string>
+    <string name="tvtoolkit_ai_copy_prompt">Copy full package list and AI prompt</string>
+    <string name="tvtoolkit_ai_format">Exact reply format (example packages below are placeholders, never real recommendations):</string>
+    <string name="tvtoolkit_ai_paste">Paste AI reply</string>
+    <string name="tvtoolkit_ai_only_preview">Check the reply locally. You decide which candidates to switch off. Before any change we check the live TV and require a restore point.</string>
+    <string name="tvtoolkit_ai_check">Check proposed packages</string>
+    <string name="tvtoolkit_ai_valid">Format, TV identity and protected-package checks passed. This is not proof of safety. Select only packages you understand.</string>
+    <string name="tvtoolkit_ai_invalid">The reply was rejected. No changes have been made. Check the reasons below and ask AI to correct the list.</string>
+    <!-- Selections are an offline draft; external APK installation is not implemented yet. -->
+    <string name="tvtoolkit_choices_title">Your TV Toolkit setup</string>
+    <string name="tvtoolkit_choices_intro">Optional software preferences. Launcher installation is separate from changing the active Home.</string>
+    <string name="tvtoolkit_launcher">Home screen</string>
+    <string name="tvtoolkit_youtube">YouTube</string>
+    <string name="tvtoolkit_media">Media apps</string>
+    <string name="tvtoolkit_wallpaper">Wallpaper</string>
+    <string name="tvtoolkit_keep_stock">Keep current</string>
+    <string name="tvtoolkit_flauncher">FLauncher</string>
+    <string name="tvtoolkit_projectivy">Projectivy Launcher</string>
+    <string name="tvtoolkit_youtube_alternative">Ad-free alternative (pending verification)</string>
+    <string name="tvtoolkit_none">None</string>
+    <string name="tvtoolkit_plex">Plex</string>
+    <string name="tvtoolkit_wholphin">Wholphin</string>
+    <string name="tvtoolkit_both">Plex and Wholphin</string>
+    <string name="tvtoolkit_aurora">Aurora</string>
+    <string name="tvtoolkit_graphite">Graphite</string>
+    <string name="tvtoolkit_choices_preview_only">Selections are a draft only. No APKs are downloaded or installed and the stock launcher remains untouched. Installation will require source, signature and CPU compatibility checks.</string>
+    <string name="tvtoolkit_choices_copy">Copy my choices</string>
+    <string name="tvtoolkit_matched_profile">Matched TV Toolkit profile</string>
+    <string name="tvtoolkit_profile_caution">Each package is optional; never disable all packages automatically.</string>
+    <string name="tvtoolkit_ai_none">AI found no high-confidence candidates. This is a valid, safe result.</string>
+    <string name="tvtoolkit_ai_choose">Select only the apps you really want to switch off. All are unselected by default.</string>
+    <string name="tvtoolkit_ai_apply">Review and switch off selected</string>
+    <string name="tvtoolkit_ai_keep">AI says to keep these packages (informational only):</string>
+    <string name="tvtoolkit_ai_working">Checking live packages, saving the restore point and running guarded changes...</string>
+    <string name="tvtoolkit_ai_confirm_title">Confirm the debloat</string>
+    <string name="tvtoolkit_ai_confirm_body">Only the packages below will be considered. The app checks the TV again and stops if the identity, package state or restore point fails. Do not continue if you rely on one of these apps.</string>
+    <string name="tvtoolkit_ai_confirm_button">Check and apply changes</string>
+    <string name="tvtoolkit_report_technical">Technical report and GitHub support</string>
+    <string name="tvtoolkit_manage_ai">Analyse packages with AI</string>
+    <string name="tvtoolkit_manage_ai_sub">Copy a safe prompt, check the reply and choose changes</string>
+    <string name="tvtoolkit_manage_launcher">Current launcher and available choices</string>
+    <string name="tvtoolkit_manage_active_home">Active Home: %1$s</string>
+    <string name="tvtoolkit_manage_active_unknown">Active Home could not be identified. No automatic switch.</string>
+    <string name="tvtoolkit_external_title">Disabled outside this app</string>
+    <string name="tvtoolkit_external_intro">These packages are off on the TV but have no change record here. Restore one only if you know why it was disabled.</string>
+    <string name="tvtoolkit_external_cached">This is the last saved reading. Reconnect and refresh before restoring a package.</string>
+    <string name="tvtoolkit_external_enable">Enable</string>
+    <string name="tvtoolkit_external_confirm">Restore an externally disabled app?</string>
+    <string name="tvtoolkit_external_confirm_body">Another tool or the TV may have disabled this deliberately. Enabling it can change the current setup. The app will recheck the state before applying the change.</string>
+    <string name="tvtoolkit_inventory_refresh">Refresh actual TV state</string>
+    <string name="tvtoolkit_disabled_summary">Disabled by this app: %1$d. Disabled on this TV overall: %2$d.</string>
+    <string name="tvtoolkit_choices_toggle">Optional launcher, media apps and wallpaper choices</string>
+    <string name="tvtoolkit_ai_batch">Choose at most 5 packages per batch, then reboot and test the TV before more changes.</string>
+    <string name="tvtoolkit_ai_show_prompt">Show the data that will be copied</string>
 </resources>

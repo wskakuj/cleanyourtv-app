@@ -57,6 +57,7 @@ import tv.cleanyour.core.flows.ReportContext
 import tv.cleanyour.core.flows.SetupEffect
 import tv.cleanyour.core.flows.SetupStart
 import tv.cleanyour.core.flows.SetupState
+import tv.cleanyour.core.flows.SetupIntent
 import tv.cleanyour.core.flows.SnackKind
 import tv.cleanyour.core.flows.StartDestination
 import tv.cleanyour.core.flows.TvWriter
@@ -282,7 +283,14 @@ fun AppRoot(graph: AppGraph, start: Dest, onExit: () -> Unit) {
                     val state by m.state.collectAsStateWithLifecycle()
                     val extras by m.extras.collectAsStateWithLifecycle()
                     LaunchedEffect(m) { m.effects.collect { onSetupEffect(it) } }
-                    BackHandler { if (!m.back()) { if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) else onExit() } }
+                    BackHandler {
+                        if (!m.back()) {
+                            val found = state as? SetupState.Found
+                            if (found != null) m.intent(SetupIntent.LeaveAsIs)
+                            else if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                            else onExit()
+                        }
+                    }
                     SecureWindow((state as? SetupState.OpenDoor)?.phase == DoorPhase.ALLOW)
                     if (isConnectState(state)) ConnectFlow(state, extras, m, onReturning = { go("returning") }, onCopyError = { copyText(context, it, "error") })
                     else SetupFlow(state, extras, m, onCopyCommands = { copyText(context, it) }, onRoute = { go(it) }, photos = photoPicker,
